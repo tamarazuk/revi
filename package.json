@@ -1,0 +1,29 @@
+{
+  "name": "revi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-only code review tool that recreates the GitHub PR Files Changed experience",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tamarazuk/revi"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean && rm -rf node_modules",
+    "cli": "pnpm --filter @revi/cli",
+    "desktop": "pnpm --filter @revi/desktop"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.5"
+  },
+  "packageManager": "pnpm@9.1.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
