@@ -12,6 +12,17 @@ interface FileTreeItemProps {
 export function FileTreeItem({ file, isSelected, isFocused, onSelect }: FileTreeItemProps) {
   const fileName = file.path.split('/').pop() || file.path;
   const isViewed = useReviewStateStore((state) => state.isViewed(file.path));
+  const { toggleViewed, files: reviewFiles } = useReviewStateStore();
+
+  const handleToggleViewed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const existingState = reviewFiles[file.path];
+    toggleViewed(
+      file.path,
+      existingState?.contentHash || '',
+      existingState?.diffStats || { additions: file.additions, deletions: file.deletions },
+    );
+  };
 
   return (
     <button
@@ -26,7 +37,11 @@ export function FileTreeItem({ file, isSelected, isFocused, onSelect }: FileTree
       })}
       onClick={onSelect}
     >
-      <span className="file-tree-item__viewed-indicator">
+      <span
+        className="file-tree-item__viewed-indicator"
+        onClick={handleToggleViewed}
+        title={isViewed ? 'Mark as unviewed' : 'Mark as viewed'}
+      >
         {isViewed ? '✓' : '○'}
       </span>
       <span className="file-tree-item__status">

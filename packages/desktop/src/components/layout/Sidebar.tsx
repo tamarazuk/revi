@@ -3,7 +3,6 @@ import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useSidebarStore, expandAllDirs } from '../../stores/sidebar';
 import { useReviewStateStore } from '../../stores/reviewState';
-import { useFileNavigation } from '../../hooks/useFileNavigation';
 import { FileFilter } from '../sidebar/FileFilter';
 import { DirectoryGroup } from '../sidebar/DirectoryGroup';
 import { ResizeHandle } from './ResizeHandle';
@@ -67,14 +66,6 @@ export function Sidebar() {
     }
   }, [allDirs]);
 
-  // Keyboard navigation
-  const { focusedFile } = useFileNavigation({
-    files: filteredFiles,
-    selectedFile,
-    onSelectFile: selectFile,
-    enabled: sidebarVisible,
-  });
-
   if (!session || !sidebarVisible) return null;
 
   const hasActiveFilters =
@@ -110,7 +101,7 @@ export function Sidebar() {
               files={files}
               selectedFile={selectedFile}
               onSelectFile={selectFile}
-              focusedFile={focusedFile}
+              focusedFile={selectedFile}
             />
           ))
         )}
@@ -118,7 +109,7 @@ export function Sidebar() {
 
       <div className="sidebar__footer">
         <span className="sidebar__hint">
-          <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>v</kbd> mark viewed
+          <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>v</kbd> viewed · <kbd>?</kbd> help
         </span>
       </div>
 

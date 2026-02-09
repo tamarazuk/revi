@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useReviewStateStore } from '../../stores/reviewState';
@@ -9,21 +9,22 @@ import { SplitView } from '../diff/SplitView';
 export function DiffPane() {
   const { selectedFile, session } = useSessionStore();
   const { diffMode } = useUIStore();
-  const { markViewed } = useReviewStateStore();
+  const { getCollapseState, setHunkCollapsed } = useReviewStateStore();
   const { diff, isLoading, error } = useDiff({ filePath: selectedFile });
 
-  // Mark file as viewed when diff successfully loads
-  useEffect(() => {
-    if (diff && selectedFile && !isLoading && !error) {
-      const file = session?.files.find((f) => f.path === selectedFile);
-      if (file) {
-        markViewed(selectedFile, diff.contentHash, {
-          additions: file.additions,
-          deletions: file.deletions,
-        });
-      }
-    }
-  }, [diff, selectedFile, isLoading, error, session, markViewed]);
+  const collapseState = selectedFile ? getCollapseState(selectedFile) : null;
+  const collapsedHunks = useMemo(
+    () => new Set(collapseState?.hunks ?? []),
+    [collapseState],
+  );
+  const onToggleHunk = useCallback(
+    (hunkIndex: number) => {
+      if (!selectedFile) return;
+      const isCollapsed = collapsedHunks.has(hunkIndex);
+      setHunkCollapsed(selectedFile, hunkIndex, !isCollapsed);
+    },
+    [selectedFile, collapsedHunks, setHunkCollapsed],
+  );
 
   if (!session) return null;
 
@@ -32,7 +33,7 @@ export function DiffPane() {
       <main className="diff-pane diff-pane--empty">
         <div className="empty-state">
           <p>Select a file to view its diff</p>
-          <p className="dim">Use j/k to navigate, Enter to open</p>
+          <p className="dim">Use j/k to navigate, Enter to open, ? for shortcuts</p>
         </div>
       </main>
     );
@@ -88,9 +89,9 @@ export function DiffPane() {
                 <p>No changes in this file</p>
               </div>
             ) : diffMode === 'split' ? (
-              <SplitView diff={diff} />
+              <SplitView diff={diff} collapsedHunks={collapsedHunks} onToggleHunk={onToggleHunk} />
             ) : (
-              <UnifiedView diff={diff} />
+              <UnifiedView diff={diff} collapsedHunks={collapsedHunks} onToggleHunk={onToggleHunk} />
             )}
           </>
         )}

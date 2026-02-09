@@ -58,7 +58,7 @@ export function TopBar({ onChangeProject }: TopBarProps) {
           onClick={toggleDiffMode}
           title={`Switch to ${diffMode === 'split' ? 'unified' : 'split'} view`}
         >
-          {diffMode === 'split' ? 'Split' : 'Unified'}
+          {diffMode === 'split' ? 'Unified' : 'Split'}
         </button>
 
         {onChangeProject && (

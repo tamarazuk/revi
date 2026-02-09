@@ -3,9 +3,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { FileDiff, Hunk, DiffLine as DiffLineType } from '@revi/shared';
 import { DiffLine } from './DiffLine';
 import { HunkHeader } from './HunkHeader';
+import { useDiffNavigation } from '../../hooks/useDiffNavigation';
+import { useKeyboardStore } from '../../stores/keyboard';
 
 interface UnifiedViewProps {
   diff: FileDiff;
+  collapsedHunks: Set<number>;
+  onToggleHunk: (hunkIndex: number) => void;
 }
 
 // A row in the virtualized list can be either a hunk header or a diff line
@@ -13,8 +17,9 @@ type VirtualRow =
   | { type: 'hunk-header'; hunk: Hunk; hunkIndex: number }
   | { type: 'line'; line: DiffLineType; hunkIndex: number; lineIndex: number };
 
-export function UnifiedView({ diff }: UnifiedViewProps) {
+export function UnifiedView({ diff, collapsedHunks, onToggleHunk }: UnifiedViewProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const activeHunkIndex = useKeyboardStore((s) => s.activeHunkIndex);
 
   // Flatten hunks and lines into a single array of virtual rows
   const rows = useMemo(() => {
@@ -24,6 +29,9 @@ export function UnifiedView({ diff }: UnifiedViewProps) {
       // Add hunk header
       result.push({ type: 'hunk-header', hunk, hunkIndex });
 
+      // Skip lines for collapsed hunks
+      if (collapsedHunks.has(hunkIndex)) return;
+
       // Add all lines in this hunk
       hunk.lines.forEach((line, lineIndex) => {
         result.push({ type: 'line', line, hunkIndex, lineIndex });
@@ -31,7 +39,7 @@ export function UnifiedView({ diff }: UnifiedViewProps) {
     });
 
     return result;
-  }, [diff.hunks]);
+  }, [diff.hunks, collapsedHunks]);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -43,6 +51,8 @@ export function UnifiedView({ diff }: UnifiedViewProps) {
     },
     overscan: 20, // Render extra items above/below viewport
   });
+
+  useDiffNavigation(rows, virtualizer);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -72,7 +82,12 @@ export function UnifiedView({ diff }: UnifiedViewProps) {
               }}
             >
               {row.type === 'hunk-header' ? (
-                <HunkHeader hunk={row.hunk} />
+                <HunkHeader
+                  hunk={row.hunk}
+                  isCollapsed={collapsedHunks.has(row.hunkIndex)}
+                  isActive={row.hunkIndex === activeHunkIndex}
+                  onToggleCollapse={() => onToggleHunk(row.hunkIndex)}
+                />
               ) : (
                 <DiffLine line={row.line} />
               )}

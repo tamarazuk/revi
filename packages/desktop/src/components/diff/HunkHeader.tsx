@@ -1,15 +1,18 @@
 import { memo } from 'react';
+import clsx from 'clsx';
 import type { Hunk } from '@revi/shared';
 
 interface HunkHeaderProps {
   hunk: Hunk;
   isCollapsed?: boolean;
+  isActive?: boolean;
   onToggleCollapse?: () => void;
 }
 
 export const HunkHeader = memo(function HunkHeader({
   hunk,
   isCollapsed = false,
+  isActive = false,
   onToggleCollapse,
 }: HunkHeaderProps) {
   // Extract the function/class context from the header if present
@@ -18,7 +21,7 @@ export const HunkHeader = memo(function HunkHeader({
   const context = contextMatch?.[1] || '';
 
   return (
-    <div className="hunk-header" onClick={onToggleCollapse}>
+    <div className={clsx('hunk-header', isActive && 'hunk-header--active')} onClick={onToggleCollapse}>
       {onToggleCollapse && (
         <span className="hunk-header__toggle">
           {isCollapsed ? '▶' : '▼'}

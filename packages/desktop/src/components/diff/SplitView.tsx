@@ -3,9 +3,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { FileDiff, Hunk, DiffLine as DiffLineType } from '@revi/shared';
 import { HunkHeader } from './HunkHeader';
 import { SplitDiffLine } from './SplitDiffLine';
+import { useDiffNavigation } from '../../hooks/useDiffNavigation';
+import { useKeyboardStore } from '../../stores/keyboard';
 
 interface SplitViewProps {
   diff: FileDiff;
+  collapsedHunks: Set<number>;
+  onToggleHunk: (hunkIndex: number) => void;
 }
 
 // For split view, we pair up old and new lines
@@ -18,8 +22,9 @@ type SplitRow =
   | { type: 'hunk-header'; hunk: Hunk; hunkIndex: number }
   | { type: 'line-pair'; pair: LinePair; hunkIndex: number; pairIndex: number };
 
-export function SplitView({ diff }: SplitViewProps) {
+export function SplitView({ diff, collapsedHunks, onToggleHunk }: SplitViewProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const activeHunkIndex = useKeyboardStore((s) => s.activeHunkIndex);
 
   // Convert hunks into paired rows for side-by-side display
   const rows = useMemo(() => {
@@ -29,6 +34,9 @@ export function SplitView({ diff }: SplitViewProps) {
       // Add hunk header
       result.push({ type: 'hunk-header', hunk, hunkIndex });
 
+      // Skip lines for collapsed hunks
+      if (collapsedHunks.has(hunkIndex)) return;
+
       // Pair up lines for split view
       const pairs = pairLinesForSplit(hunk.lines);
       pairs.forEach((pair, pairIndex) => {
@@ -37,7 +45,7 @@ export function SplitView({ diff }: SplitViewProps) {
     });
 
     return result;
-  }, [diff.hunks]);
+  }, [diff.hunks, collapsedHunks]);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -48,6 +56,8 @@ export function SplitView({ diff }: SplitViewProps) {
     },
     overscan: 20,
   });
+
+  useDiffNavigation(rows, virtualizer);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -77,7 +87,12 @@ export function SplitView({ diff }: SplitViewProps) {
               }}
             >
               {row.type === 'hunk-header' ? (
-                <HunkHeader hunk={row.hunk} />
+                <HunkHeader
+                  hunk={row.hunk}
+                  isCollapsed={collapsedHunks.has(row.hunkIndex)}
+                  isActive={row.hunkIndex === activeHunkIndex}
+                  onToggleCollapse={() => onToggleHunk(row.hunkIndex)}
+                />
               ) : (
                 <SplitDiffLine pair={row.pair} />
               )}

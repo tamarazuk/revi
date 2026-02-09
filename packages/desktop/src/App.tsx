@@ -2,8 +2,10 @@ import { TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DiffPane } from './components/layout/DiffPane';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { KeyboardHelp } from './components/overlays/KeyboardHelp';
 import { useSessionStore } from './stores/session';
 import { useReviewStateStore } from './stores/reviewState';
+import { useKeyboardManager } from './hooks/useKeyboardManager';
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -41,6 +43,9 @@ export function App() {
     
     initSession();
   }, [loadSession, loadLastSession]);
+
+  // Central keyboard handler — must be called unconditionally (rules of hooks)
+  useKeyboardManager();
 
   // Load review state when session changes
   useEffect(() => {
@@ -137,6 +142,7 @@ export function App() {
           <DiffPane />
         </ErrorBoundary>
       </div>
+      <KeyboardHelp />
     </div>
   );
 }
