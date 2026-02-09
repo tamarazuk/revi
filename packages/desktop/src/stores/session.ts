@@ -20,6 +20,7 @@ interface SessionState {
   loadSessionFromRepo: (repoPath: string, baseRef?: string) => Promise<void>;
   loadSessionWithMode: (repoPath: string, mode: ComparisonMode) => Promise<void>;
   loadLastSession: () => Promise<boolean>;
+  refreshSession: () => Promise<void>;
   clearSession: () => Promise<void>;
   selectFile: (path: string) => void;
   selectNextFile: () => void;
@@ -167,6 +168,44 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       selectedFile: null,
       error: null,
     });
+  },
+
+  refreshSession: async () => {
+    const { session, selectedFile } = get();
+    if (!session) return;
+
+    set({ isLoading: true, error: null });
+
+    try {
+      // Invalidate diff cache before refreshing
+      await invoke('invalidate_diff_cache', { repoRoot: session.repoRoot }).catch(() => {});
+
+      // Get the current comparison mode from the session
+      const mode = session.comparisonMode ?? null;
+
+      // Recreate the session with the same mode
+      const manifest = await invoke<ReviewManifest>('create_session_from_repo', {
+        repoPath: session.repoRoot,
+        baseRef: null,
+        mode,
+      });
+
+      // Try to preserve the selected file if it still exists
+      const preservedFile = manifest.files.find((f) => f.path === selectedFile);
+      const newSelectedFile = preservedFile?.path ?? manifest.files[0]?.path ?? null;
+
+      set({
+        session: manifest,
+        sessionPath: null,
+        selectedFile: newSelectedFile,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        isLoading: false,
+      });
+    }
   },
 
   selectFile: (path: string) => {

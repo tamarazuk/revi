@@ -47,6 +47,9 @@ lru = "0.12"
 # Sync primitives for cache
 once_cell = "1"
 
+# File system watcher for change detection
+notify = "7"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

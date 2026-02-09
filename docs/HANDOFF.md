@@ -34,15 +34,15 @@
 | **Phase 7** | Done | Keyboard navigation, hunk collapse, help overlay |
 | **Phase 8** | Done | Multi-window management (Cmd+N, window state persistence, restore) |
 | **Phase 9** | Done | File interactions (open in editor, copy path, context menu) |
+| **Phase 10** | Done | Change detection (file watcher, refresh banner, state preservation) |
 
 ### Recent Git History
 
 ```
-aec0a54 docs: add Phase 13 (Testing) to implementation plan
-7631be0 test(desktop): add unit tests for dimension sanitization and validate on write
-c6d3915 fix(desktop): sanitize window dimensions to prevent rendering corruption
-230d074 feat(desktop): add Phosphor Icons and replace inline SVGs
+Phase 10: Change detection with file watcher and refresh banner
 6df7838 feat(desktop): add file interactions and zoom support (Phase 9)
+aec0a54 docs: add Phase 13 (Testing) to implementation plan
+7631be0 test(desktop): add unit tests for dimension sanitization
 ```
 
 ---
@@ -212,6 +212,7 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `Cmd+Plus` | Zoom in |
 | `Cmd+Minus` | Zoom out |
 | `Cmd+0` | Reset zoom |
+| `R` | Refresh session (when changes detected) |
 
 **Implementation**: Single `useKeyboardManager` hook in `App.tsx` attaches one global `keydown` listener. Shortcuts are blocked when typing in inputs or when the help overlay is open (only `?`/`Escape` pass through). Hunk navigation uses a `useDiffNavigation` hook in each diff view that registers a scroll callback with the `keyboard` store.
 
@@ -244,6 +245,8 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `get_window_session` | window.rs | Get saved session info for a window |
 | `open_in_editor` | file_ops.rs | Open file in default/configured editor |
 | `copy_to_clipboard` | file_ops.rs | Copy text to system clipboard |
+| `start_watching` | watcher.rs | Start file watcher for a repository |
+| `stop_watching` | watcher.rs | Stop file watcher for a repository |
 
 ---
 
@@ -288,13 +291,56 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ---
 
+## Phase 10: Change Detection (Completed)
+
+### What was built
+
+**Rust (`watcher.rs`)**:
+- `WatcherManager` — app-level state managing file watchers per repository
+- `start_watching` — starts a recursive file watcher on the repo root
+- `stop_watching` — stops the watcher for a repository
+- Path filtering: ignores `.revi/`, `.git/objects`, `.git/logs`, `node_modules/`, `target/`, `dist/`, `build/`, etc.
+- Git ref detection: recognizes changes to `.git/HEAD`, `.git/refs`, `.git/index`
+- Debounced events (300ms) to prevent event flooding
+- Emits `repo-changed` Tauri event to frontend
+
+**Frontend**:
+- `RefreshBanner.tsx` — non-intrusive banner with "Changes detected — [Refresh] [Dismiss]"
+- `App.tsx` — listens for `repo-changed` event, shows banner, handles refresh/dismiss
+- `session.ts` — new `refreshSession` action that:
+  - Invalidates diff cache
+  - Recreates session with same comparison mode
+  - Preserves selected file if it still exists (fuzzy recovery)
+
+### How it works
+
+1. When a session loads, `start_watching` is called with the repo root
+2. The `notify` crate watches for file system changes recursively
+3. Changes are filtered to exclude build artifacts, caches, and git internals
+4. Relevant changes trigger a debounced `repo-changed` Tauri event
+5. Frontend shows the RefreshBanner
+6. User clicks Refresh → session is recreated, viewed state preserved
+7. User clicks Dismiss → banner hidden until next change
+8. When session changes or window closes, watcher is stopped
+
+### New Tauri Commands
+
+| Command | Description |
+|---------|-------------|
+| `start_watching` | Start file watcher for a repository |
+| `stop_watching` | Stop file watcher for a repository |
+
+### Keyboard Shortcut
+
+| Key | Action |
+|-----|--------|
+| `R` | Refresh session (when banner is visible) |
+
+---
+
 ## What's Next
 
-### Phase 10: Change Detection (3-4 days) - RECOMMENDED NEXT
-- File watcher for live updates (`notify` + `tokio` crates — reserved, not yet added)
-- Refresh flow with state preservation
-
-### Phase 11: Polish & Config (3-4 days)
+### Phase 11: Polish & Config (3-4 days) - RECOMMENDED NEXT
 - Exclusion patterns (.gitignore-style)
 - Whitespace toggle
 - Config file loading

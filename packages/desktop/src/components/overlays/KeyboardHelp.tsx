@@ -19,6 +19,7 @@ const SHORTCUT_GROUPS = [
       { keys: ['v'], label: 'Toggle viewed' },
       { keys: ['['], label: 'Collapse active hunk' },
       { keys: [']'], label: 'Expand active hunk' },
+      { keys: ['r'], label: 'Refresh (when changes detected)' },
     ],
   },
   {

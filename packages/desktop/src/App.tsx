@@ -3,19 +3,28 @@ import { Sidebar } from './components/layout/Sidebar';
 import { DiffPane } from './components/layout/DiffPane';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { KeyboardHelp } from './components/overlays/KeyboardHelp';
+import { RefreshBanner } from './components/overlays/RefreshBanner';
 import { useSessionStore } from './stores/session';
 import { useReviewStateStore } from './stores/reviewState';
 import { useKeyboardManager } from './hooks/useKeyboardManager';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
+interface ChangeEvent {
+  type: 'file_changed' | 'ref_changed' | 'commit_added';
+  paths?: string[];
+  newHeadSha?: string;
+}
+
 export function App() {
-  const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, clearError } = useSessionStore();
+  const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, refreshSession, clearError } = useSessionStore();
   const { loadState: loadReviewState, reset: resetReviewState } = useReviewStateStore();
   const [isPickingFolder, setIsPickingFolder] = useState(false);
   const [initComplete, setInitComplete] = useState(false);
+  const [changesDetected, setChangesDetected] = useState(false);
 
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
@@ -97,6 +106,73 @@ export function App() {
     }
   }, [session]);
 
+  // File watcher: start watching when session loads, stop when it unloads
+  useEffect(() => {
+    if (!session) {
+      setChangesDetected(false);
+      return;
+    }
+
+    const repoRoot = session.repoRoot;
+
+    // Start watching the repository
+    invoke('start_watching', { repoRoot }).catch((err) => {
+      console.warn('Failed to start file watcher:', err);
+    });
+
+    // Listen for change events
+    let unlisten: UnlistenFn | null = null;
+
+    listen<ChangeEvent>('repo-changed', () => {
+      setChangesDetected(true);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      // Stop watching when session changes or component unmounts
+      invoke('stop_watching', { repoRoot }).catch(() => {});
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, [session?.repoRoot, session?.sessionId]);
+
+  // Refresh handler
+  const handleRefresh = useCallback(() => {
+    setChangesDetected(false);
+    refreshSession();
+  }, [refreshSession]);
+
+  // Dismiss handler
+  const handleDismiss = useCallback(() => {
+    setChangesDetected(false);
+  }, []);
+
+  // Keyboard shortcut for refresh (R key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip when typing in inputs
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // R key triggers refresh when changes are detected
+      if (e.key === 'r' || e.key === 'R') {
+        if (changesDetected) {
+          e.preventDefault();
+          handleRefresh();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [changesDetected, handleRefresh]);
+
   const handleOpenRepository = async () => {
     setIsPickingFolder(true);
     try {
@@ -167,6 +243,9 @@ export function App() {
   return (
     <div className="app">
       <TopBar />
+      {changesDetected && (
+        <RefreshBanner onRefresh={handleRefresh} onDismiss={handleDismiss} />
+      )}
       <div className="app__body">
         <Sidebar />
         <ErrorBoundary>

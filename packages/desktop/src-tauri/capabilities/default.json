@@ -5,6 +5,7 @@
   "windows": ["main", "revi-*"],
   "permissions": [
     "core:default",
+    "core:window:allow-set-title",
     "fs:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
