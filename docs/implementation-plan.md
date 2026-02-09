@@ -23,8 +23,9 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 10 | Change Detection | 3-4 days | File watcher, refresh flow |
 | 11 | Polish & Config | 3-4 days | Exclusions, whitespace toggle, config loading |
 | 12 | MVP Comments & AI Export | 3-4 days | Line comments with AI-friendly markdown export |
+| 13 | Testing | 5-7 days | Unit tests, integration tests, E2E setup |
 
-**Total estimated time: 6-8 weeks**
+**Total estimated time: 7-9 weeks**
 
 ---
 
@@ -1271,6 +1272,270 @@ Can add comments on diff lines, click sidebar button to copy all as markdown for
 
 ---
 
+## Phase 13: Testing
+
+### Goal
+Add comprehensive test coverage to prevent regressions and enable confident refactoring.
+
+### Current State
+
+Existing tests (as of Phase 9 completion):
+- **Rust**: 10 unit tests for window dimension sanitization + language detection
+- **React/CLI**: No tests yet
+
+### Test Infrastructure Setup
+
+#### Rust (Already configured)
+```bash
+cd packages/desktop/src-tauri && cargo test
+```
+
+#### React Frontend (New setup required)
+```bash
+# Add testing dependencies
+pnpm --filter @revi/desktop add -D vitest @testing-library/react @testing-library/jest-dom jsdom @tauri-apps/api
+```
+
+```typescript
+// packages/desktop/vitest.config.ts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+  },
+});
+```
+
+#### CLI (New setup required)
+```bash
+pnpm --filter @revi/cli add -D vitest
+```
+
+### Test Scope by Layer
+
+#### 1. Rust Backend — Priority: HIGH (2-3 days)
+
+| Module | LOC | Tests to Add | Effort |
+|--------|-----|--------------|--------|
+| `git.rs` | 517 | Diff parsing, caching, content hashing | 4-6 hrs |
+| `session.rs` | 853 | Session creation, state persistence, manifest loading | 6-8 hrs |
+| `highlight.rs` | 393 | Language detection (exists), span mapping | 2-3 hrs |
+| `window.rs` | 422 | Dimension sanitization (done), restore logic | 1 hr |
+| `file_ops.rs` | 95 | Editor command parsing | 1 hr |
+
+**Key test cases for `git.rs`:**
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parse_unified_diff_basic() { ... }
+    
+    #[test]
+    fn parse_diff_with_renames() { ... }
+    
+    #[test]
+    fn handle_new_file_diff() { ... }
+    
+    #[test]
+    fn handle_deleted_file_diff() { ... }
+    
+    #[test]
+    fn cache_hit_returns_cached_diff() { ... }
+    
+    #[test]
+    fn cache_miss_computes_new_diff() { ... }
+    
+    #[test]
+    fn working_tree_diff_bypasses_cache() { ... }
+}
+```
+
+**Key test cases for `session.rs`:**
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn create_session_from_valid_repo() { ... }
+    
+    #[test]
+    fn create_session_fails_for_non_git_dir() { ... }
+    
+    #[test]
+    fn persist_and_load_review_state() { ... }
+    
+    #[test]
+    fn detect_uncommitted_changes() { ... }
+}
+```
+
+#### 2. React Frontend — Priority: MEDIUM (2-3 days)
+
+| Category | Files | Tests to Add | Effort |
+|----------|-------|--------------|--------|
+| **Stores** | 5 | State mutations, selectors | 4-5 hrs |
+| **Hooks** | 3 | Keyboard handling, navigation | 3-4 hrs |
+| **Components** | ~17 | Key interactions, rendering | 6-8 hrs |
+
+**Store tests (Zustand):**
+```typescript
+// src/stores/__tests__/session.test.ts
+import { useSessionStore } from '../session';
+
+describe('useSessionStore', () => {
+  beforeEach(() => {
+    useSessionStore.setState({ session: null, selectedFile: null });
+  });
+
+  it('selectFile updates selectedFile', () => {
+    useSessionStore.getState().selectFile('src/index.ts');
+    expect(useSessionStore.getState().selectedFile).toBe('src/index.ts');
+  });
+
+  it('selectNextFile advances to next file', () => { ... });
+  it('selectPrevFile goes to previous file', () => { ... });
+});
+```
+
+**Hook tests:**
+```typescript
+// src/hooks/__tests__/useKeyboardManager.test.ts
+import { renderHook } from '@testing-library/react';
+import { useKeyboardManager } from '../useKeyboardManager';
+
+describe('useKeyboardManager', () => {
+  it('j key selects next file', () => { ... });
+  it('k key selects previous file', () => { ... });
+  it('ignores keys when typing in input', () => { ... });
+  it('? key toggles help overlay', () => { ... });
+});
+```
+
+**Component tests (key interactions):**
+```typescript
+// src/components/sidebar/__tests__/FileTreeItem.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import { FileTreeItem } from '../FileTreeItem';
+
+describe('FileTreeItem', () => {
+  it('renders file name and status badge', () => { ... });
+  it('shows context menu on right click', () => { ... });
+  it('calls onSelect when clicked', () => { ... });
+});
+```
+
+#### 3. CLI — Priority: LOW (1 day)
+
+| Module | Tests to Add | Effort |
+|--------|--------------|--------|
+| `git/detect.ts` | Repo detection, worktree handling | 2 hrs |
+| `git/refs.ts` | Ref parsing, merge-base detection | 2 hrs |
+| `git/diff.ts` | Diff stat parsing | 2 hrs |
+| `manifest/writer.ts` | Manifest generation | 1 hr |
+
+```typescript
+// packages/cli/src/git/__tests__/detect.test.ts
+import { detectRepo } from '../detect';
+
+describe('detectRepo', () => {
+  it('returns repo root for valid git directory', () => { ... });
+  it('returns null for non-git directory', () => { ... });
+  it('handles nested directories', () => { ... });
+});
+```
+
+### Tasks
+
+**Setup (Day 1)**
+- [ ] Configure Vitest for React frontend
+- [ ] Configure Vitest for CLI
+- [ ] Add test scripts to package.json files
+- [ ] Create mock utilities for Tauri API calls
+- [ ] Add CI workflow for running tests (optional)
+
+**Rust Tests (Days 2-3)**
+- [ ] Add unit tests for `git.rs` diff parsing
+- [ ] Add unit tests for `git.rs` caching logic
+- [ ] Add unit tests for `session.rs` session creation
+- [ ] Add unit tests for `session.rs` state persistence
+- [ ] Add unit tests for `file_ops.rs` editor command parsing
+- [ ] Extend `highlight.rs` tests for edge cases
+
+**React Tests (Days 4-5)**
+- [ ] Add unit tests for all Zustand stores
+- [ ] Add unit tests for `useKeyboardManager` hook
+- [ ] Add unit tests for `useDiffNavigation` hook
+- [ ] Add component tests for `FileTreeItem`
+- [ ] Add component tests for `DiffLine`
+- [ ] Add component tests for `ContextMenu`
+
+**CLI Tests (Day 6)**
+- [ ] Add unit tests for git detection
+- [ ] Add unit tests for ref parsing
+- [ ] Add unit tests for manifest generation
+
+**Integration Tests (Day 7)**
+- [ ] Add integration test for session creation flow
+- [ ] Add integration test for diff loading flow
+- [ ] Document E2E test strategy for future
+
+### Test Commands
+
+Add to root `package.json`:
+```json
+{
+  "scripts": {
+    "test": "turbo run test",
+    "test:rust": "cd packages/desktop/src-tauri && cargo test",
+    "test:desktop": "pnpm --filter @revi/desktop test",
+    "test:cli": "pnpm --filter @revi/cli test"
+  }
+}
+```
+
+### Mocking Tauri APIs
+
+```typescript
+// packages/desktop/src/test/mocks/tauri.ts
+import { vi } from 'vitest';
+
+export const mockInvoke = vi.fn();
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: mockInvoke,
+}));
+
+vi.mock('@tauri-apps/api/webviewWindow', () => ({
+  getCurrentWebviewWindow: () => ({
+    label: 'main',
+    setTitle: vi.fn(),
+  }),
+}));
+```
+
+### Coverage Targets
+
+| Layer | Target Coverage | Priority |
+|-------|-----------------|----------|
+| Rust Backend | 70%+ | High |
+| React Stores | 80%+ | High |
+| React Hooks | 70%+ | Medium |
+| React Components | 50%+ | Low |
+| CLI | 60%+ | Low |
+
+### Deliverable
+- All packages have test infrastructure configured
+- Rust backend has comprehensive unit tests for core logic
+- React stores and hooks have unit tests
+- Key component interactions are tested
+- `pnpm test` runs all tests across the monorepo
+
+---
+
 ## Risk Areas & Mitigations
 
 | Risk | Impact | Mitigation |
@@ -1285,17 +1550,19 @@ Can add comments on diff lines, click sidebar button to copy all as markdown for
 
 ## Testing Strategy
 
+See **Phase 13** for detailed test implementation plan.
+
 ### Unit Tests
 - CLI: git operations, manifest generation
 - Shared: schema validation, type guards
-- Rust: diff parsing, content hashing, recovery logic
+- Rust: diff parsing, content hashing, recovery logic, dimension sanitization
 
 ### Integration Tests
 - CLI → manifest → Desktop load
 - Diff fetch → highlight → render
 - State persist → recovery flow
 
-### E2E Tests (Playwright + Tauri)
+### E2E Tests (Playwright + Tauri) — Future
 - Full review flow: open, navigate, mark viewed
 - Keyboard navigation
 - Refresh flow with state preservation
@@ -1324,3 +1591,6 @@ Can add comments on diff lines, click sidebar button to copy all as markdown for
 - [ ] "Copy Comments for AI" button copies markdown to clipboard
 - [ ] Comments persist in state file
 - [ ] Line drift shows warning badge when content changed
+- [ ] Rust backend has 70%+ test coverage
+- [ ] React stores and hooks have unit tests
+- [ ] `pnpm test` runs all tests successfully
