@@ -10,12 +10,13 @@ out/
 # Tauri
 packages/desktop/src-tauri/target/
 
-# IDE
+# IDE & Agents
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+.claude/
 
 # Environment
 .env
