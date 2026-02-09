@@ -12,6 +12,8 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct ChangeEvent {
     #[serde(rename = "type")]
     pub event_type: String, // "file_changed" | "ref_changed"
+    #[serde(rename = "repoRoot")]
+    pub repo_root: String, // Which repo this change is for
     pub paths: Option<Vec<String>>,
     #[serde(rename = "newHeadSha")]
     pub new_head_sha: Option<String>,
@@ -57,9 +59,8 @@ const IGNORED_DIRS: &[&str] = &[
 
 /// File patterns to ignore (checked against filename, not full path)
 const IGNORED_FILES: &[&str] = &[
-    ".DS_Store",  // macOS
-    "Thumbs.db",  // Windows
-    ".gitignore", // Usually not relevant to diff
+    ".DS_Store", // macOS
+    "Thumbs.db", // Windows
 ];
 
 /// File suffixes to ignore
@@ -74,8 +75,9 @@ const IGNORED_SUFFIXES: &[&str] = &[
 ];
 
 /// File prefixes to ignore
+/// NOTE: We don't ignore all dotfiles because tracked files like .gitignore,
+/// .eslintrc, etc. are legitimate code changes that should trigger refresh.
 const IGNORED_PREFIXES: &[&str] = &[
-    ".", // Hidden files (covers .DS_Store, editor configs, etc.)
     "#", // Emacs auto-save
 ];
 
@@ -89,11 +91,12 @@ fn should_ignore(path: &Path, repo_root: &Path) -> bool {
     let path_str = relative.to_string_lossy();
 
     // Check if path starts with or contains an ignored directory
+    // Must match full directory component, not just prefix (e.g., ".git/" not ".gitignore")
     for ignored_dir in IGNORED_DIRS {
-        if path_str.starts_with(ignored_dir)
-            || path_str.starts_with(&format!("{}/", ignored_dir))
-            || path_str.contains(&format!("/{}/", ignored_dir))
-            || path_str.contains(&format!("/{}", ignored_dir)) && path_str.ends_with(ignored_dir)
+        let dir_with_slash = format!("{}/", ignored_dir);
+        if path_str.starts_with(&dir_with_slash)
+            || path_str.contains(&format!("/{}", dir_with_slash))
+            || path_str == *ignored_dir
         {
             return true;
         }
@@ -131,24 +134,25 @@ fn is_content_change(kind: &EventKind) -> bool {
     match kind {
         // File/directory created
         EventKind::Create(CreateKind::File) => true,
+        EventKind::Create(CreateKind::Any) => true,
 
         // File content modified (NOT metadata like permissions/timestamps)
         EventKind::Modify(ModifyKind::Data(_)) => true,
 
-        // File renamed (this is a content change from the perspective of the old/new paths)
+        // File renamed
         EventKind::Modify(ModifyKind::Name(_)) => true,
+
+        // On macOS (FSEvents), modifications often come as Modify::Any
+        // because the backend can't distinguish data vs metadata changes.
+        // We accept these since our path filtering is strict enough.
+        EventKind::Modify(ModifyKind::Any) => true,
 
         // File/directory removed
         EventKind::Remove(RemoveKind::File) => true,
-
-        // Catch-all for platforms that don't distinguish (like some Linux configs)
-        // But be conservative - only if it's clearly a create/remove
-        EventKind::Create(CreateKind::Any) => true,
         EventKind::Remove(RemoveKind::Any) => true,
 
-        // Ignore everything else:
-        // - Modify::Metadata (permissions, timestamps, etc.)
-        // - Modify::Any (too ambiguous)
+        // Ignore:
+        // - Modify::Metadata (permissions, timestamps - when distinguishable)
         // - Access events
         // - Other events
         _ => false,
@@ -237,8 +241,9 @@ fn handle_event(
     // Filter paths - must have at least one relevant path
     let relevant_paths: Vec<PathBuf> = event
         .paths
-        .into_iter()
+        .iter()
         .filter(|p| !should_ignore(p, repo_root))
+        .cloned()
         .collect();
 
     if relevant_paths.is_empty() {
@@ -292,6 +297,7 @@ fn handle_event(
 
     let change_event = ChangeEvent {
         event_type: "file_changed".to_string(),
+        repo_root: repo_root.to_string_lossy().to_string(),
         paths: Some(paths),
         new_head_sha: None,
     };

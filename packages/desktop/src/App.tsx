@@ -15,6 +15,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 interface ChangeEvent {
   type: 'file_changed' | 'ref_changed' | 'commit_added';
+  repoRoot: string; // Which repo this change is for
   paths?: string[];
   newHeadSha?: string;
 }
@@ -123,7 +124,11 @@ export function App() {
     // Listen for change events
     let unlisten: UnlistenFn | null = null;
 
-    listen<ChangeEvent>('repo-changed', () => {
+    listen<ChangeEvent>('repo-changed', (event) => {
+      // Only respond to changes for THIS window's repo
+      if (event.payload.repoRoot !== repoRoot) {
+        return;
+      }
       setChangesDetected(true);
     }).then((fn) => {
       unlisten = fn;
