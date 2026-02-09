@@ -1,11 +1,8 @@
 import { memo } from 'react';
-import type { DiffLine as DiffLineType, HighlightSpan } from '@revi/shared';
+import type { DiffLine as DiffLineType } from '@revi/shared';
 import clsx from 'clsx';
-
-interface LinePair {
-  oldLine: DiffLineType | null;
-  newLine: DiffLineType | null;
-}
+import { HighlightedCode } from './HighlightedCode';
+import type { LinePair } from './SplitView';
 
 interface SplitDiffLineProps {
   pair: LinePair;
@@ -52,52 +49,12 @@ function SplitSide({ line, side }: SplitSideProps) {
         {isModified ? (line.type === 'added' ? '+' : '-') : ' '}
       </span>
       <span className="split-side__content">
-        <HighlightedCode content={line.content} highlights={line.highlights} />
+        <HighlightedCode
+          content={line.content}
+          highlights={line.highlights}
+          emptyClassName="split-side__empty"
+        />
       </span>
     </div>
   );
-}
-
-interface HighlightedCodeProps {
-  content: string;
-  highlights: HighlightSpan[];
-}
-
-function HighlightedCode({ content, highlights }: HighlightedCodeProps) {
-  if (!content) {
-    return <span className="split-side__empty">&nbsp;</span>;
-  }
-
-  if (highlights.length === 0) {
-    return <>{content}</>;
-  }
-
-  const sorted = [...highlights].sort((a, b) => a.start - b.start);
-  const parts: React.ReactNode[] = [];
-  let lastEnd = 0;
-
-  for (let i = 0; i < sorted.length; i++) {
-    const span = sorted[i];
-
-    if (span.start > lastEnd) {
-      parts.push(
-        <span key={`plain-${i}`}>{content.slice(lastEnd, span.start)}</span>
-      );
-    }
-
-    const scopeClass = `hl-${span.scope.replace(/\./g, '-')}`;
-    parts.push(
-      <span key={`hl-${i}`} className={scopeClass}>
-        {content.slice(span.start, span.end)}
-      </span>
-    );
-
-    lastEnd = span.end;
-  }
-
-  if (lastEnd < content.length) {
-    parts.push(<span key="plain-end">{content.slice(lastEnd)}</span>);
-  }
-
-  return <>{parts}</>;
 }

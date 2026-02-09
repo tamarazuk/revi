@@ -91,7 +91,7 @@ pub fn get_file_diff(
         ignore_whitespace,
     );
     if !is_working_tree {
-        let mut cache = DIFF_CACHE.lock().unwrap();
+        let mut cache = DIFF_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(cached) = cache.get(&key) {
             return Ok(cached.clone());
         }
@@ -194,7 +194,7 @@ pub fn get_file_diff(
 
     // Store in cache (only for commit-to-commit diffs)
     if !is_working_tree {
-        let mut cache = DIFF_CACHE.lock().unwrap();
+        let mut cache = DIFF_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         cache.put(key, diff.clone());
     }
 
@@ -205,7 +205,7 @@ pub fn get_file_diff(
 /// Called when repository changes are detected
 #[tauri::command]
 pub fn invalidate_diff_cache(repo_root: String) {
-    let mut cache = DIFF_CACHE.lock().unwrap();
+    let mut cache = DIFF_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     // Collect keys to remove (can't modify while iterating)
     let keys_to_remove: Vec<String> = cache
         .iter()
@@ -221,7 +221,7 @@ pub fn invalidate_diff_cache(repo_root: String) {
 /// Clear entire diff cache
 #[tauri::command]
 pub fn clear_diff_cache() {
-    let mut cache = DIFF_CACHE.lock().unwrap();
+    let mut cache = DIFF_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.clear();
 }
 
@@ -254,7 +254,16 @@ fn get_file_at_ref(repo_root: &str, ref_name: &str, file_path: &str) -> Result<S
 
 /// Get file content from the working tree
 fn get_file_from_working_tree(repo_root: &str, file_path: &str) -> Result<String, String> {
-    let full_path = std::path::Path::new(repo_root).join(file_path);
+    let root = std::path::Path::new(repo_root)
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize repo root: {}", e))?;
+    let full_path = root
+        .join(file_path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to canonicalize file path: {}", e))?;
+    if !full_path.starts_with(&root) {
+        return Err("Path escapes the repository root".to_string());
+    }
     std::fs::read_to_string(&full_path)
         .map_err(|e| format!("Failed to read file from working tree: {}", e))
 }

@@ -123,8 +123,13 @@ body {
   border-color: var(--accent-blue);
 }
 
-.btn--primary:hover {
+.btn--primary:hover:not(:disabled) {
   background-color: #4c9aed;
+}
+
+.btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn--secondary {
@@ -340,12 +345,6 @@ body {
 .diff-pane__stats {
   font-family: monospace;
   font-size: 0.875rem;
-}
-
-.diff-pane__content {
-  flex: 1;
-  overflow: auto;
-  padding: 1rem;
 }
 
 .diff-placeholder {
@@ -1083,35 +1082,3 @@ body {
   border-color: var(--accent-blue);
 }
 
-/* Buttons */
-.btn {
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  border: 1px solid transparent;
-}
-
-.btn--primary {
-  background: var(--accent-blue);
-  color: #fff;
-}
-
-.btn--primary:hover:not(:disabled) {
-  background: #4a90e0;
-}
-
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--secondary {
-  background: transparent;
-  border-color: var(--border-color);
-  color: var(--text-primary);
-}
-
-.btn--secondary:hover {
-  background: var(--bg-tertiary);
-}

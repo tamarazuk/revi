@@ -13,7 +13,6 @@ export type {
 export type {
   PersistedState,
   FileState,
-  DiffStats as StateDiffStats,
   CollapseState,
   UIState,
   DiffMode,

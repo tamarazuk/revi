@@ -14,38 +14,34 @@ interface ReviewStateStore {
   baseSha: string | null;
   headSha: string | null;
   files: Record<string, FileState>;
-  
+
   // Loading state
   isLoaded: boolean;
   isSaving: boolean;
-  
-  // Debounced save timer
-  _saveTimer: ReturnType<typeof setTimeout> | null;
 
   // Actions - file state
   markViewed: (path: string, contentHash: string, diffStats: DiffStats) => void;
   markUnviewed: (path: string) => void;
   toggleViewed: (path: string, contentHash: string, diffStats: DiffStats) => void;
   isViewed: (path: string) => boolean;
-  
+
   // Actions - collapse state
   setFileCollapsed: (path: string, collapsed: boolean) => void;
   setHunkCollapsed: (path: string, hunkIndex: number, collapsed: boolean) => void;
   getCollapseState: (path: string) => CollapseState;
-  
+
   // Actions - scroll position
   setScrollPosition: (path: string, position: number) => void;
   getScrollPosition: (path: string) => number;
-  
+
   // Persistence
   loadState: (repoRoot: string, sessionId: string, baseSha: string, headSha: string) => Promise<void>;
   saveState: () => Promise<void>;
   scheduleSave: () => void;
   reset: () => void;
-  
+
   // Stats
   getViewedCount: () => number;
-  getTotalCount: () => number;
 }
 
 const DEFAULT_FILE_STATE: FileState = {
@@ -62,6 +58,9 @@ const DEFAULT_COLLAPSE_STATE: CollapseState = { file: false, hunks: [] };
 // Debounce delay for auto-save (500ms)
 const SAVE_DEBOUNCE_MS = 500;
 
+// Module-level timer handle (not part of store state)
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
   sessionId: null,
   repoRoot: null,
@@ -70,7 +69,6 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
   files: {},
   isLoaded: false,
   isSaving: false,
-  _saveTimer: null,
 
   markViewed: (path: string, contentHash: string, diffStats: DiffStats) => {
     const { baseSha } = get();
@@ -251,27 +249,23 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
   },
 
   scheduleSave: () => {
-    const { _saveTimer } = get();
-    
     // Clear existing timer
-    if (_saveTimer) {
-      clearTimeout(_saveTimer);
+    if (saveTimer) {
+      clearTimeout(saveTimer);
     }
-    
+
     // Schedule new save
-    const timer = setTimeout(() => {
+    saveTimer = setTimeout(() => {
       get().saveState();
     }, SAVE_DEBOUNCE_MS);
-    
-    set({ _saveTimer: timer });
   },
 
   reset: () => {
-    const { _saveTimer } = get();
-    if (_saveTimer) {
-      clearTimeout(_saveTimer);
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
     }
-    
+
     set({
       sessionId: null,
       repoRoot: null,
@@ -280,17 +274,11 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
       files: {},
       isLoaded: false,
       isSaving: false,
-      _saveTimer: null,
     });
   },
 
   getViewedCount: () => {
     const { files } = get();
     return Object.values(files).filter((f) => f.viewed).length;
-  },
-
-  getTotalCount: () => {
-    // This should be called with the session file count externally
-    return Object.keys(get().files).length;
   },
 }));

@@ -375,6 +375,54 @@ fn has_uncommitted_changes(repo_root: &str) -> Result<bool, String> {
     Ok(!stdout.trim().is_empty())
 }
 
+/// Parse a rename path that may use `{prefix/old => new}/suffix` format or plain `old => new`.
+/// Returns `(new_path, Some(old_path))`.
+fn parse_rename_path(path: &str) -> (String, Option<String>) {
+    // Handle {prefix/old => new}/suffix format
+    if let (Some(brace_start), Some(brace_end)) = (path.find('{'), path.find('}')) {
+        let prefix = &path[..brace_start];
+        let suffix = &path[brace_end + 1..];
+        let inner = &path[brace_start + 1..brace_end];
+        if let Some((old_part, new_part)) = inner.split_once(" => ") {
+            let old_path = format!("{}{}{}", prefix, old_part, suffix);
+            let new_path = format!("{}{}{}", prefix, new_part, suffix);
+            return (new_path, Some(old_path));
+        }
+    }
+    // Handle plain old => new format
+    if let Some((old, new)) = path.split_once(" => ") {
+        return (new.to_string(), Some(old.to_string()));
+    }
+    (path.to_string(), None)
+}
+
+/// Build a HashMap of path -> status letter from `git diff --name-status` output.
+fn parse_name_status(output: &str) -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    for line in output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.is_empty() {
+            continue;
+        }
+        let status_letter = parts[0].chars().next().unwrap_or('M');
+        let status = match status_letter {
+            'A' => "added",
+            'D' => "deleted",
+            'M' => "modified",
+            'R' => "renamed",
+            'C' => "copied",
+            _ => "modified",
+        };
+        // For renames/copies the new path is the last column
+        let path = parts.last().unwrap_or(&"");
+        map.insert(path.to_string(), status.to_string());
+    }
+    map
+}
+
 /// Get list of uncommitted files (staged + unstaged + untracked)
 fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
     // Get diff stats for tracked files (both staged and unstaged) against HEAD
@@ -383,6 +431,15 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
         .current_dir(repo_root)
         .output()
         .map_err(|e| format!("Failed to get diff: {}", e))?;
+
+    // Get name-status for accurate status detection
+    let name_status_output = Command::new("git")
+        .args(["diff", "HEAD", "--name-status", "--find-renames"])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| format!("Failed to get name-status: {}", e))?;
+    let name_status_map =
+        parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
 
     let mut files = Vec::new();
     let stdout = String::from_utf8_lossy(&diff_output.stdout);
@@ -404,23 +461,15 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
         // Check for binary files (- - indicates binary)
         let binary = parts[0] == "-" && parts[1] == "-";
 
-        // Check for renames
-        let (path, renamed_from, status) = if path_part.contains(" => ") {
-            let rename_parts: Vec<&str> = path_part.split(" => ").collect();
-            (
-                rename_parts[1].to_string(),
-                Some(rename_parts[0].to_string()),
-                "renamed".to_string(),
-            )
+        // Check for renames using the shared helper
+        let (path, renamed_from) = parse_rename_path(path_part);
+        let status = if renamed_from.is_some() {
+            "renamed".to_string()
         } else {
-            let status = if additions > 0 && deletions == 0 {
-                "added"
-            } else if additions == 0 && deletions > 0 {
-                "deleted"
-            } else {
-                "modified"
-            };
-            (path_part.to_string(), None, status.to_string())
+            name_status_map
+                .get(&path)
+                .cloned()
+                .unwrap_or_else(|| "modified".to_string())
         };
 
         files.push(FileEntry {
@@ -467,38 +516,6 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
     Ok(files)
 }
 
-fn resolve_base_ref(repo_root: &str, base_ref: Option<String>) -> Result<RefInfo, String> {
-    // If base_ref is provided, use it
-    if let Some(ref_name) = base_ref {
-        return get_ref_info(repo_root, &ref_name);
-    }
-
-    // Try to find merge-base with main or master
-    for default_branch in &["main", "master", "origin/main", "origin/master"] {
-        if let Ok(merge_base) = get_merge_base(repo_root, default_branch) {
-            return Ok(RefInfo {
-                ref_name: merge_base.clone(),
-                sha: merge_base,
-            });
-        }
-    }
-
-    // Fallback: use HEAD~10 or first commit if not enough history
-    let output = Command::new("git")
-        .args(["rev-list", "--count", "HEAD"])
-        .current_dir(repo_root)
-        .output()
-        .map_err(|e| format!("Failed to count commits: {}", e))?;
-
-    let count: u32 = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse()
-        .unwrap_or(1);
-
-    let base_ref = if count > 10 { "HEAD~10" } else { "HEAD~1" };
-    get_ref_info(repo_root, base_ref)
-}
-
 fn get_merge_base(repo_root: &str, branch: &str) -> Result<String, String> {
     let output = Command::new("git")
         .args(["merge-base", "HEAD", branch])
@@ -537,13 +554,10 @@ fn get_changed_files(
     base_sha: &str,
     head_sha: &str,
 ) -> Result<Vec<FileEntry>, String> {
+    let diff_range = format!("{}...{}", base_sha, head_sha);
+
     let output = Command::new("git")
-        .args([
-            "diff",
-            "--numstat",
-            "--find-renames",
-            &format!("{}...{}", base_sha, head_sha),
-        ])
+        .args(["diff", "--numstat", "--find-renames", &diff_range])
         .current_dir(repo_root)
         .output()
         .map_err(|e| format!("Failed to get diff: {}", e))?;
@@ -551,6 +565,15 @@ fn get_changed_files(
     if !output.status.success() {
         return Err("Failed to get changed files".to_string());
     }
+
+    // Get name-status for accurate status detection
+    let name_status_output = Command::new("git")
+        .args(["diff", "--name-status", "--find-renames", &diff_range])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| format!("Failed to get name-status: {}", e))?;
+    let name_status_map =
+        parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
 
     let mut files = Vec::new();
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -572,24 +595,15 @@ fn get_changed_files(
         // Check for binary files (- - indicates binary)
         let binary = parts[0] == "-" && parts[1] == "-";
 
-        // Check for renames (path contains " => " or uses {old => new} format)
-        let (path, renamed_from, status) = if path_part.contains(" => ") {
-            let rename_parts: Vec<&str> = path_part.split(" => ").collect();
-            (
-                rename_parts[1].to_string(),
-                Some(rename_parts[0].to_string()),
-                "renamed".to_string(),
-            )
+        // Check for renames using the shared helper
+        let (path, renamed_from) = parse_rename_path(path_part);
+        let status = if renamed_from.is_some() {
+            "renamed".to_string()
         } else {
-            // Determine status based on file existence
-            let status = if additions > 0 && deletions == 0 {
-                "added"
-            } else if additions == 0 && deletions > 0 {
-                "deleted"
-            } else {
-                "modified"
-            };
-            (path_part.to_string(), None, status.to_string())
+            name_status_map
+                .get(&path)
+                .cloned()
+                .unwrap_or_else(|| "modified".to_string())
         };
 
         files.push(FileEntry {

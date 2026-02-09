@@ -1,3 +1,5 @@
+import type { DiffStats } from './diff';
+
 /**
  * Persisted Review State - stored in .revi/state/
  * Uses content hashing for fuzzy recovery across rebases/amends
@@ -18,11 +20,6 @@ export interface FileState {
   diffStats: DiffStats;
   collapseState: CollapseState;
   scrollPosition: number;
-}
-
-export interface DiffStats {
-  additions: number;
-  deletions: number;
 }
 
 export interface CollapseState {

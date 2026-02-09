@@ -20,10 +20,7 @@ export function TopBar({ onChangeProject }: TopBarProps) {
   
   // Detect if we're currently viewing uncommitted changes
   const isUncommittedMode = session.head.sha === 'WORKING_TREE';
-  
-  // For now, assume uncommitted changes exist if we're in uncommitted mode
-  // In a real implementation, we'd query the backend
-  const hasUncommittedChanges = isUncommittedMode || session.files.length > 0;
+  const hasUncommittedChanges = isUncommittedMode;
 
   const handleModeChange = (mode: ComparisonMode) => {
     loadSessionWithMode(session.repoRoot, mode);

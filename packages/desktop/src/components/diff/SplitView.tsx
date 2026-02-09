@@ -9,7 +9,7 @@ interface SplitViewProps {
 }
 
 // For split view, we pair up old and new lines
-interface LinePair {
+export interface LinePair {
   oldLine: DiffLineType | null;
   newLine: DiffLineType | null;
 }

@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useSidebarStore, expandAllDirs } from '../../stores/sidebar';
@@ -58,12 +58,14 @@ export function Sidebar() {
     return Object.keys(groupedFiles).filter((dir) => dir !== '');
   }, [groupedFiles]);
 
-  // Auto-expand all directories on initial load
+  // Auto-expand all directories on initial load only
+  const hasInitialized = useRef(false);
   useEffect(() => {
-    if (allDirs.length > 0 && expandedDirs.size === 0) {
+    if (allDirs.length > 0 && !hasInitialized.current) {
+      hasInitialized.current = true;
       expandAllDirs(allDirs);
     }
-  }, [allDirs, expandedDirs.size]);
+  }, [allDirs]);
 
   // Keyboard navigation
   const { focusedFile } = useFileNavigation({

@@ -17,7 +17,6 @@ interface SidebarState {
   toggleDir: (path: string) => void;
   expandDir: (path: string) => void;
   collapseDir: (path: string) => void;
-  expandAll: () => void;
   collapseAll: () => void;
 
   setStatusFilter: (statuses: FileStatus[]) => void;
@@ -63,11 +62,6 @@ export const useSidebarStore = create<SidebarState>((set) => ({
       next.delete(path);
       return { expandedDirs: next };
     });
-  },
-
-  expandAll: () => {
-    // Will be populated with all directories when called
-    // The actual logic happens in the component that knows the directories
   },
 
   collapseAll: () => {

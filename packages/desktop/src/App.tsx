@@ -1,6 +1,7 @@
 import { TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DiffPane } from './components/layout/DiffPane';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { useSessionStore } from './stores/session';
 import { useReviewStateStore } from './stores/reviewState';
 import { useEffect, useState } from 'react';
@@ -132,7 +133,9 @@ export function App() {
       <TopBar onChangeProject={handleChangeProject} />
       <div className="app__body">
         <Sidebar />
-        <DiffPane />
+        <ErrorBoundary>
+          <DiffPane />
+        </ErrorBoundary>
       </div>
     </div>
   );

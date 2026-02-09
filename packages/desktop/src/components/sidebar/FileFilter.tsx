@@ -1,5 +1,6 @@
 import { useSidebarStore } from '../../stores/sidebar';
 import type { FileStatus } from '@revi/shared';
+import clsx from 'clsx';
 
 const STATUS_OPTIONS: { value: FileStatus; label: string; color: string }[] = [
   { value: 'added', label: 'A', color: 'var(--accent-green)' },
@@ -50,11 +51,9 @@ export function FileFilter() {
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              className={`file-filter__status-btn ${
-                filter.status.includes(opt.value)
-                  ? 'file-filter__status-btn--active'
-                  : ''
-              }`}
+              className={clsx('file-filter__status-btn', {
+                'file-filter__status-btn--active': filter.status.includes(opt.value),
+              })}
               style={
                 filter.status.includes(opt.value)
                   ? { backgroundColor: opt.color, borderColor: opt.color }
@@ -71,11 +70,9 @@ export function FileFilter() {
           {VIEWED_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              className={`file-filter__viewed-btn ${
-                filter.viewedState === opt.value
-                  ? 'file-filter__viewed-btn--active'
-                  : ''
-              }`}
+              className={clsx('file-filter__viewed-btn', {
+                'file-filter__viewed-btn--active': filter.viewedState === opt.value,
+              })}
               onClick={() => setViewedFilter(opt.value)}
               title={`Show ${opt.label.toLowerCase()} files`}
             >

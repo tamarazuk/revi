@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ComparisonMode } from '@revi/shared';
+import clsx from 'clsx';
 
 interface Props {
   currentMode: ComparisonMode | undefined;
@@ -82,9 +83,10 @@ export function ComparisonModeDropdown({
         <div className="comparison-mode-dropdown__menu">
           <div className="comparison-mode-dropdown__section">
             <button
-              className={`comparison-mode-dropdown__item ${
-                currentMode?.type === 'uncommitted' ? 'is-active' : ''
-              } ${!hasUncommittedChanges ? 'is-disabled' : ''}`}
+              className={clsx('comparison-mode-dropdown__item', {
+                'is-active': currentMode?.type === 'uncommitted',
+                'is-disabled': !hasUncommittedChanges,
+              })}
               onClick={() => handleModeSelect({ type: 'uncommitted' })}
               disabled={!hasUncommittedChanges}
             >
@@ -109,12 +111,11 @@ export function ComparisonModeDropdown({
             {branches.slice(0, 10).map((branch) => (
               <button
                 key={branch}
-                className={`comparison-mode-dropdown__item ${
-                  currentMode?.type === 'branch' &&
-                  currentMode.baseBranch === branch
-                    ? 'is-active'
-                    : ''
-                }`}
+                className={clsx('comparison-mode-dropdown__item', {
+                  'is-active':
+                    currentMode?.type === 'branch' &&
+                    currentMode.baseBranch === branch,
+                })}
                 onClick={() => handleBranchSelect(branch)}
               >
                 <span className="comparison-mode-dropdown__item-label">
@@ -147,7 +148,6 @@ export function ComparisonModeDropdown({
 
       {showCustomModal && (
         <CustomComparisonModal
-          repoRoot={repoRoot}
           branches={branches}
           onSelect={(mode) => {
             onModeChange(mode);
@@ -161,14 +161,12 @@ export function ComparisonModeDropdown({
 }
 
 interface CustomModalProps {
-  repoRoot: string;
   branches: string[];
   onSelect: (mode: ComparisonMode) => void;
   onClose: () => void;
 }
 
 function CustomComparisonModal({
-  repoRoot: _repoRoot,
   branches,
   onSelect,
   onClose,

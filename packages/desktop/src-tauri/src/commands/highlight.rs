@@ -224,7 +224,7 @@ fn get_language_info(
 
 /// Ensure a highlight configuration exists for the given language
 fn ensure_config(language: &str) -> bool {
-    let mut configs = CONFIGS.lock().unwrap();
+    let mut configs = CONFIGS.lock().unwrap_or_else(|e| e.into_inner());
 
     if configs.contains_key(language) {
         return true;
@@ -259,7 +259,7 @@ pub fn highlight_code_internal(
         return Ok(Vec::new()); // Return empty for unsupported languages
     }
 
-    let configs = CONFIGS.lock().unwrap();
+    let configs = CONFIGS.lock().unwrap_or_else(|e| e.into_inner());
     let config = match configs.get(language) {
         Some(c) => c,
         None => return Ok(Vec::new()),
