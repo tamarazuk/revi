@@ -172,6 +172,72 @@ pub fn get_window_session(
     Ok(windows.get(&window_label).cloned())
 }
 
+/// Find a window that has the given repo open (excluding the current window)
+#[tauri::command]
+pub fn find_window_by_repo(
+    app: AppHandle,
+    repo_path: String,
+    exclude_label: Option<String>,
+) -> Result<Option<String>, String> {
+    let manager = app.state::<WindowManager>();
+    let windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+
+    for (label, info) in windows.iter() {
+        // Skip the excluded window (usually the current one)
+        if let Some(ref exclude) = exclude_label {
+            if label == exclude {
+                continue;
+            }
+        }
+
+        // Check if this window has the same repo
+        if let Some(ref path) = info.repo_path {
+            if path == &repo_path {
+                return Ok(Some(label.clone()));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Focus a window by label and optionally close another window
+#[tauri::command]
+pub fn focus_window_and_close(
+    app: AppHandle,
+    focus_label: String,
+    close_label: Option<String>,
+) -> Result<(), String> {
+    // Focus the target window
+    if let Some(window) = app.get_webview_window(&focus_label) {
+        window
+            .set_focus()
+            .map_err(|e| format!("Failed to focus window: {}", e))?;
+    } else {
+        return Err(format!("Window '{}' not found", focus_label));
+    }
+
+    // Close the other window if specified
+    if let Some(ref label) = close_label {
+        if let Some(window) = app.get_webview_window(label) {
+            // Remove from manager first
+            let manager = app.state::<WindowManager>();
+            {
+                let mut windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+                windows.remove(label);
+            }
+
+            // Close the window
+            let _ = window.close();
+
+            // Persist updated state
+            let _ = persist_states_sync(&app);
+        }
+    }
+
+    Ok(())
+}
+
 /// Persist current window states to disk. Called from event handlers.
 pub fn persist_states_sync(app: &AppHandle) -> Result<(), String> {
     let manager = app.state::<WindowManager>();

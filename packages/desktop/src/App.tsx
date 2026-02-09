@@ -188,7 +188,26 @@ export function App() {
       });
       
       if (selected) {
-        await loadSessionFromRepo(selected as string);
+        const repoPath = selected as string;
+        const currentWindow = getCurrentWebviewWindow();
+        
+        // Check if this repo is already open in another window
+        const existingWindow = await invoke<string | null>('find_window_by_repo', {
+          repoPath,
+          excludeLabel: currentWindow.label,
+        });
+        
+        if (existingWindow) {
+          // Focus the existing window and close this one (if it has no session)
+          const closeLabel = session ? null : currentWindow.label;
+          await invoke('focus_window_and_close', {
+            focusLabel: existingWindow,
+            closeLabel,
+          });
+          return;
+        }
+        
+        await loadSessionFromRepo(repoPath);
       }
     } catch (err) {
       console.error('Failed to open folder:', err);

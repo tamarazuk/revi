@@ -36,6 +36,8 @@ fn main() {
             window::save_window_states,
             window::load_window_states,
             window::get_window_session,
+            window::find_window_by_repo,
+            window::focus_window_and_close,
             file_ops::open_in_editor,
             file_ops::copy_to_clipboard,
             watcher::start_watching,
