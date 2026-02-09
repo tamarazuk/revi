@@ -57,12 +57,18 @@ fn main() {
                     }
                 }
                 tauri::WindowEvent::Resized(size) => {
-                    let manager = app.state::<window::WindowManager>();
-                    let mut windows =
-                        manager.windows.lock().unwrap_or_else(|e| e.into_inner());
-                    if let Some(info) = windows.get_mut(&label) {
-                        info.width = Some(size.width as f64);
-                        info.height = Some(size.height as f64);
+                    let width = size.width as f64;
+                    let height = size.height as f64;
+
+                    // Only store valid dimensions to prevent corrupted state
+                    if window::is_valid_width(width) && window::is_valid_height(height) {
+                        let manager = app.state::<window::WindowManager>();
+                        let mut windows =
+                            manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Some(info) = windows.get_mut(&label) {
+                            info.width = Some(width);
+                            info.height = Some(height);
+                        }
                     }
                 }
                 tauri::WindowEvent::CloseRequested { .. } => {

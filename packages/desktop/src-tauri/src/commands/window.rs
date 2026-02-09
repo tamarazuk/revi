@@ -24,6 +24,21 @@ fn sanitize_dimensions(width: Option<f64>, height: Option<f64>) -> (f64, f64) {
     (w, h)
 }
 
+/// Check if a dimension value is within valid bounds (for write-path validation)
+pub fn is_valid_dimension(value: f64, min: f64, max: f64) -> bool {
+    value >= min && value <= max && value.is_finite()
+}
+
+/// Check if width is within valid bounds
+pub fn is_valid_width(width: f64) -> bool {
+    is_valid_dimension(width, MIN_WIDTH, MAX_WIDTH)
+}
+
+/// Check if height is within valid bounds
+pub fn is_valid_height(height: f64) -> bool {
+    is_valid_dimension(height, MIN_HEIGHT, MAX_HEIGHT)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub label: String,
@@ -268,5 +283,140 @@ pub fn restore_windows(app: &AppHandle) {
                 windows.insert(info.label.clone(), info.clone());
             }
         }
+    }
+}
+
+/// Sanitize a single dimension value, returning None if out of bounds
+pub fn sanitize_dimension(value: f64, min: f64, max: f64) -> Option<f64> {
+    if is_valid_dimension(value, min, max) {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_dimensions_returns_defaults_for_none() {
+        assert_eq!(
+            sanitize_dimensions(None, None),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn sanitize_dimensions_accepts_valid_values() {
+        assert_eq!(
+            sanitize_dimensions(Some(1200.0), Some(800.0)),
+            (1200.0, 800.0)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(MIN_WIDTH), Some(MIN_HEIGHT)),
+            (MIN_WIDTH, MIN_HEIGHT)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(MAX_WIDTH), Some(MAX_HEIGHT)),
+            (MAX_WIDTH, MAX_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn sanitize_dimensions_clamps_values_below_minimum() {
+        assert_eq!(
+            sanitize_dimensions(Some(100.0), Some(100.0)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(799.0), Some(599.0)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn sanitize_dimensions_clamps_values_above_maximum() {
+        assert_eq!(
+            sanitize_dimensions(Some(200000.0), Some(900.0)),
+            (DEFAULT_WIDTH, 900.0)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(1400.0), Some(10000.0)),
+            (1400.0, DEFAULT_HEIGHT)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(9000.0), Some(6000.0)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn sanitize_dimensions_handles_mixed_valid_invalid() {
+        // Valid width, invalid height
+        assert_eq!(
+            sanitize_dimensions(Some(1400.0), Some(100.0)),
+            (1400.0, DEFAULT_HEIGHT)
+        );
+        // Invalid width, valid height
+        assert_eq!(
+            sanitize_dimensions(Some(100.0), Some(800.0)),
+            (DEFAULT_WIDTH, 800.0)
+        );
+    }
+
+    #[test]
+    fn sanitize_dimensions_handles_edge_cases() {
+        // Negative values
+        assert_eq!(
+            sanitize_dimensions(Some(-100.0), Some(-100.0)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+        // Zero
+        assert_eq!(
+            sanitize_dimensions(Some(0.0), Some(0.0)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+        // NaN and infinity would fail the >= check, so they become defaults
+        assert_eq!(
+            sanitize_dimensions(Some(f64::NAN), Some(f64::NAN)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+        assert_eq!(
+            sanitize_dimensions(Some(f64::INFINITY), Some(f64::INFINITY)),
+            (DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
+    }
+
+    #[test]
+    fn is_valid_width_checks_bounds() {
+        assert!(is_valid_width(1000.0));
+        assert!(is_valid_width(MIN_WIDTH));
+        assert!(is_valid_width(MAX_WIDTH));
+        assert!(!is_valid_width(100.0));
+        assert!(!is_valid_width(10000.0));
+        assert!(!is_valid_width(f64::NAN));
+        assert!(!is_valid_width(f64::INFINITY));
+    }
+
+    #[test]
+    fn is_valid_height_checks_bounds() {
+        assert!(is_valid_height(800.0));
+        assert!(is_valid_height(MIN_HEIGHT));
+        assert!(is_valid_height(MAX_HEIGHT));
+        assert!(!is_valid_height(100.0));
+        assert!(!is_valid_height(6000.0));
+        assert!(!is_valid_height(f64::NAN));
+        assert!(!is_valid_height(f64::INFINITY));
+    }
+
+    #[test]
+    fn sanitize_dimension_single_value() {
+        assert_eq!(
+            sanitize_dimension(1000.0, MIN_WIDTH, MAX_WIDTH),
+            Some(1000.0)
+        );
+        assert_eq!(sanitize_dimension(100.0, MIN_WIDTH, MAX_WIDTH), None);
+        assert_eq!(sanitize_dimension(10000.0, MIN_WIDTH, MAX_WIDTH), None);
     }
 }
