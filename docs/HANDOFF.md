@@ -38,13 +38,11 @@
 ### Recent Git History
 
 ```
-(pending commit) feat(desktop): add file interactions (Phase 9)
-(pending commit) feat(desktop): add multi-window management (Phase 8)
+6df7838 feat(desktop): add file interactions and zoom support (Phase 9)
+705d828 feat(desktop): add multi-window management and update handoff (Phase 8)
 00daead feat(desktop): add keyboard navigation, hunk collapse, and help overlay (Phase 7)
 20c0668 fix: address 20 codebase review issues across security, correctness, and quality
 8a098bb feat(desktop): add comparisson mode switcher
-3fc18c4 feat(desktop): complete Phase 6 state management with viewed file tracking
-cc4586e feat(desktop): add session persistence and update handoff
 ```
 
 ---
@@ -89,7 +87,8 @@ revi/
 │   │   │   │   ├── sidebar/      # FileFilter, DirectoryGroup, FileTreeItem, DiffStatsBar
 │   │   │   │   ├── topbar/       # ComparisonModeDropdown
 │   │   │   │   ├── diff/         # DiffLine, HunkHeader, UnifiedView, SplitView, SplitDiffLine
-│   │   │   │   └── overlays/     # KeyboardHelp
+│   │   │   │   ├── overlays/     # KeyboardHelp
+│   │   │   │   └── ui/           # ContextMenu
 │   │   │   ├── stores/
 │   │   │   │   ├── session.ts    # Session state + persistence + window state saving
 │   │   │   │   ├── sidebar.ts    # Filter/expand state
@@ -110,7 +109,8 @@ revi/
 │   │   │   │       ├── session.rs    # Session CRUD, persistence, working tree
 │   │   │   │       ├── git.rs        # Diff fetching, caching, new/deleted file handling
 │   │   │   │       ├── highlight.rs  # Tree-sitter with full-file context
-│   │   │   │       └── window.rs     # Window manager, create/restore/persist windows
+│   │   │   │       ├── window.rs     # Window manager, create/restore/persist windows
+│   │   │   │       └── file_ops.rs   # Open in editor, clipboard operations
 │   │   │   ├── capabilities/
 │   │   │   │   └── default.json  # Permissions for main + revi-* windows
 │   │   │   ├── icons/            # App icons (icon.png, icon.svg)
@@ -205,7 +205,11 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `Escape` | Close help overlay |
 | `Cmd+N` / `Ctrl+N` | New window |
 | `Cmd+Shift+O` | Open file in editor |
-| `Cmd+Shift+C` | Copy file path |
+| `Cmd+C` | Copy relative path |
+| `Cmd+Shift+C` | Copy absolute path |
+| `Cmd+Plus` | Zoom in |
+| `Cmd+Minus` | Zoom out |
+| `Cmd+0` | Reset zoom |
 
 **Implementation**: Single `useKeyboardManager` hook in `App.tsx` attaches one global `keydown` listener. Shortcuts are blocked when typing in inputs or when the help overlay is open (only `?`/`Escape` pass through). Hunk navigation uses a `useDiffNavigation` hook in each diff view that registers a scroll callback with the `keyboard` store.
 
@@ -259,19 +263,26 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 - Smart editor detection: handles VS Code (`code -g file:line`), Vim/Neovim (`+line file`), and others
 
 **Frontend**:
-- `useKeyboardManager.ts` — Added `Cmd+Shift+O` (open in editor) and `Cmd+Shift+C` (copy path) shortcuts
+- `useKeyboardManager.ts` — Added shortcuts:
+  - `Cmd+Shift+O` — open in editor
+  - `Cmd+C` — copy relative path
+  - `Cmd+Shift+C` — copy absolute path
+  - `Cmd+Plus/Minus/0` — zoom in/out/reset
 - `ContextMenu.tsx` — New reusable context menu component with keyboard dismiss support
-- `FileTreeItem.tsx` — Right-click context menu with "Open in Editor" and "Copy Path" options
-- `KeyboardHelp.tsx` — Added new shortcuts to help overlay
+- `FileTreeItem.tsx` — Right-click context menu with "Open in Editor", "Copy Relative Path", "Copy Absolute Path"
+- `DiffPane.tsx` — Quick action buttons in header (copy icon, code file icon) for copy path and open in editor
+- `KeyboardHelp.tsx` — Updated with all new shortcuts
 
 **Capabilities**:
-- Added `shell:allow-spawn` and `clipboard-manager:allow-write-text` permissions
+- Added `shell:allow-spawn`, `clipboard-manager:allow-write-text`, `core:webview:allow-set-webview-zoom` permissions
 
 ### How it works
 
-1. **Keyboard shortcut**: With a file selected, press `Cmd+Shift+O` to open in editor or `Cmd+Shift+C` to copy absolute path
+1. **Keyboard shortcuts**: With a file selected, press `Cmd+Shift+O` to open in editor, `Cmd+C` for relative path, `Cmd+Shift+C` for absolute path
 2. **Context menu**: Right-click any file in the sidebar to see options with shortcuts displayed
-3. **Editor detection**: Checks `$VISUAL` → `$EDITOR` → system default. Supports line numbers for VS Code/Vim.
+3. **Quick actions**: Icon buttons next to file path in diff pane header
+4. **Zoom**: Standard browser-like zoom with `Cmd+Plus/Minus/0` using Tauri's WebView zoom API
+5. **Editor detection**: Checks `$VISUAL` → `$EDITOR` → system default. Supports line numbers for VS Code/Vim.
 
 ---
 
@@ -303,7 +314,7 @@ See `docs/implementation-plan.md` for full task breakdown.
 3. **Comparison mode persistence** - Last-used mode not yet persisted per repository
 4. **`G` key (Shift+g)** - The `case 'g'` in useKeyboardManager checks `e.shiftKey` but `e.key` is `'G'` when shifted, so `G` for last file may not work — needs a `case 'G':` added
 5. **Command palette** - Deferred from Phase 7, not yet implemented
-6. **Phases 8-9 not yet build-tested** - All code is written but `pnpm dev` / `cargo build` has not been run to verify compilation
+6. **Zoom persistence** - Zoom level resets on app restart (could persist to localStorage)
 
 ---
 
