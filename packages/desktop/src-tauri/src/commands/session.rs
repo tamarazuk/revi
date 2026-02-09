@@ -5,6 +5,18 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use tauri::{AppHandle, Manager};
+
+/// Information about the last opened session, persisted to app data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LastSession {
+    #[serde(rename = "repoPath")]
+    pub repo_path: String,
+    #[serde(rename = "baseRef")]
+    pub base_ref: Option<String>,
+    #[serde(rename = "savedAt")]
+    pub saved_at: String,
+}
 
 #[tauri::command]
 pub fn get_session_arg() -> Option<String> {
@@ -570,4 +582,90 @@ fn ensure_gitignore(repo_root: &str) {
         use std::io::Write;
         let _ = writeln!(f, "\n# Revi local review data\n.revi/");
     }
+}
+
+/// Save the last opened session to app data directory
+#[tauri::command]
+pub fn save_last_session(
+    app: AppHandle,
+    repo_path: String,
+    base_ref: Option<String>,
+) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    fs::create_dir_all(&app_data_dir)
+        .map_err(|e| format!("Failed to create app data directory: {}", e))?;
+
+    let last_session = LastSession {
+        repo_path,
+        base_ref,
+        saved_at: Utc::now().to_rfc3339(),
+    };
+
+    let session_path = app_data_dir.join("last-session.json");
+    let content = serde_json::to_string_pretty(&last_session)
+        .map_err(|e| format!("Failed to serialize last session: {}", e))?;
+
+    fs::write(&session_path, content)
+        .map_err(|e| format!("Failed to write last session: {}", e))?;
+
+    Ok(())
+}
+
+/// Load the last opened session from app data directory
+#[tauri::command]
+pub fn load_last_session(app: AppHandle) -> Result<Option<LastSession>, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    let session_path = app_data_dir.join("last-session.json");
+
+    if !session_path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&session_path)
+        .map_err(|e| format!("Failed to read last session: {}", e))?;
+
+    let last_session: LastSession = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse last session: {}", e))?;
+
+    // Verify the repo still exists
+    let repo_path = Path::new(&last_session.repo_path);
+    if !repo_path.exists() {
+        // Repo no longer exists, clear the saved session
+        let _ = fs::remove_file(&session_path);
+        return Ok(None);
+    }
+
+    // Verify it's still a git repo
+    if get_repo_root(&last_session.repo_path).is_err() {
+        let _ = fs::remove_file(&session_path);
+        return Ok(None);
+    }
+
+    Ok(Some(last_session))
+}
+
+/// Clear the last session (used when user wants to pick a different project)
+#[tauri::command]
+pub fn clear_last_session(app: AppHandle) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+
+    let session_path = app_data_dir.join("last-session.json");
+
+    if session_path.exists() {
+        fs::remove_file(&session_path)
+            .map_err(|e| format!("Failed to clear last session: {}", e))?;
+    }
+
+    Ok(())
 }

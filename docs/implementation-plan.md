@@ -21,6 +21,7 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 9 | Change Detection | 3-4 days | File watcher, refresh flow |
 | 10 | Polish & Config | 3-4 days | Exclusions, whitespace toggle, config loading |
 | 11 | MVP Comments & AI Export | 3-4 days | Line comments with AI-friendly markdown export |
+| 12 | Multi-Window Management | 3-4 days | Multiple windows, each with independent project |
 
 **Total estimated time: 6-8 weeks**
 
@@ -1104,6 +1105,78 @@ When the diff changes (refresh after new commit), comments may reference stale l
 
 ### Deliverable
 Can add comments on diff lines, click sidebar button to copy all as markdown for AI agents.
+
+---
+
+## Phase 12: Multi-Window Management
+
+### Goal
+Support multiple independent windows, each viewing a different project. Enable workflows like reviewing multiple PRs simultaneously or comparing changes across repos.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Main Process                          │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Window Manager                          │ │
+│  │  - Track open windows and their sessions             │ │
+│  │  - Handle window lifecycle (create, close)           │ │
+│  │  - Persist window state for restore on relaunch      │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+   ┌──────────┐         ┌──────────┐         ┌──────────┐
+   │ Window 1 │         │ Window 2 │         │ Window N │
+   │ Project A│         │ Project B│         │ Project C│
+   │ (own     │         │ (own     │         │ (own     │
+   │  stores) │         │  stores) │         │  stores) │
+   └──────────┘         └──────────┘         └──────────┘
+```
+
+### Window State Model
+
+```typescript
+interface WindowState {
+  windowId: string;
+  repoPath: string;
+  baseRef: string;
+  headRef: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  selectedFile?: string;
+}
+
+interface AppState {
+  windows: WindowState[];
+  lastActiveWindowId: string;
+}
+```
+
+### Key Features
+
+1. **New Window** (Cmd+N): Opens project picker in new window
+2. **Open Recent**: Menu showing recently opened projects
+3. **Window Menu**: List of open windows with project names
+4. **Independent State**: Each window has isolated Zustand stores
+5. **Restore on Launch**: Reopen all windows from previous session
+
+### Tasks
+
+- [ ] Create Rust-side window manager to track windows
+- [ ] Implement `create_window` Tauri command with unique window ID
+- [ ] Isolate Zustand stores per window (use window ID as namespace)
+- [ ] Add "File > New Window" menu item (Cmd+N)
+- [ ] Add "File > Open Recent" submenu
+- [ ] Persist all window states to app data directory
+- [ ] Restore windows on app launch
+- [ ] Update window title to include project name
+- [ ] Handle window close (remove from state, cleanup)
+- [ ] Add Window menu showing all open projects
+
+### Deliverable
+Can open multiple windows viewing different projects, all restored on app relaunch.
 
 ---
 

@@ -10,7 +10,7 @@
 - **CLI**: Node.js + TypeScript + Commander.js
 - **Desktop Frontend**: React 18 + Zustand + Vite
 - **Desktop Backend**: Tauri 2 (Rust)
-- **Syntax Highlighting**: Tree-sitter
+- **Syntax Highlighting**: Tree-sitter (full-file context for accurate highlighting)
 - **Build**: pnpm workspaces + Turborepo
 
 ---
@@ -21,20 +21,44 @@
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| **Phase 0** | ✅ Complete | Monorepo scaffolding (pnpm + Turborepo) |
-| **Phase 1** | ✅ Complete | CLI foundation (git detection, manifest generation) |
-| **Phase 2** | ✅ Complete | Desktop shell (three-pane layout, session loading) |
-| **Phase 2b** | ✅ Complete | Project picker (folder dialog, standalone launch) |
-| **Phase 3** | ✅ Complete | Rust backend (Tree-sitter highlighting, diff caching) |
+| **Phase 0** | Done | Monorepo scaffolding (pnpm + Turborepo) |
+| **Phase 1** | Done | CLI foundation (git detection, manifest generation) |
+| **Phase 2** | Done | Desktop shell (three-pane layout, session loading) |
+| **Phase 2b** | Done | Project picker (folder dialog, standalone launch) |
+| **Phase 3** | Done | Rust backend (Tree-sitter highlighting, diff caching) |
+| **Phase 4** | Done | File tree sidebar (filters, directory groups, keyboard nav) |
+| **Phase 5** | Done | Diff rendering (unified/split views, syntax highlighting) |
+| **Session Persistence** | Done | Auto-restore last project on app relaunch |
 
-### Git History
+### Recent Git History
 
 ```
+54ed78b chore(desktop): update app icon with diff-themed design
+cf91d33 feat(desktop): complete Phase 5 diff rendering with full-file syntax highlighting
+011d7ec feat(desktop): complete Phase 4 file tree sidebar
 81b68d2 feat(desktop): complete Phase 2-3 with working tree support
 74369eb docs: add v1.75 MVP Comments & AI Export feature
 16c6490 feat(cli): complete Phase 1 CLI foundation
 f58d9f6 feat: scaffold monorepo with CLI, desktop, and shared packages
-5e2d60c docs: add PRD and implementation plan
+```
+
+---
+
+## How to Run
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run desktop app in dev mode (from root)
+pnpm dev
+
+# Build CLI and link globally (optional)
+pnpm build
+cd packages/cli && pnpm link --global
+
+# Then use anywhere:
+revi .
 ```
 
 ---
@@ -47,61 +71,51 @@ revi/
 │   ├── cli/                      # Node.js CLI
 │   │   ├── src/
 │   │   │   ├── index.ts          # Commander.js entry
-│   │   │   ├── commands/
-│   │   │   │   ├── review.ts     # Main review command
-│   │   │   │   └── sessions.ts   # List/clean sessions
-│   │   │   ├── git/
-│   │   │   │   ├── detect.ts     # Repo/worktree detection
-│   │   │   │   ├── refs.ts       # Ref resolution
-│   │   │   │   └── diff.ts       # Changed files parsing
-│   │   │   ├── manifest/
-│   │   │   │   └── writer.ts     # Manifest JSON writer
-│   │   │   └── app/
-│   │   │       └── launcher.ts   # App launcher (placeholder)
+│   │   │   ├── commands/         # review.ts, sessions.ts
+│   │   │   ├── git/              # detect.ts, refs.ts, diff.ts
+│   │   │   └── manifest/         # writer.ts
 │   │   └── package.json
 │   │
 │   ├── desktop/                  # Tauri + React app
 │   │   ├── src/                  # React frontend
-│   │   │   ├── App.tsx           # Main app with folder picker
+│   │   │   ├── App.tsx           # Main app with session persistence
 │   │   │   ├── components/
-│   │   │   │   └── layout/
-│   │   │   │       ├── TopBar.tsx
-│   │   │   │       ├── Sidebar.tsx
-│   │   │   │       ├── DiffPane.tsx      # Placeholder for Phase 5
-│   │   │   │       └── ResizeHandle.tsx
+│   │   │   │   ├── layout/       # TopBar, Sidebar, DiffPane
+│   │   │   │   ├── sidebar/      # FileFilter, DirectoryGroup, FileTreeItem, DiffStatsBar
+│   │   │   │   └── diff/         # DiffLine, HunkHeader, UnifiedView, SplitView, SplitDiffLine
 │   │   │   ├── stores/
-│   │   │   │   ├── session.ts    # Session state + Tauri calls
-│   │   │   │   └── ui.ts         # UI preferences
+│   │   │   │   ├── session.ts    # Session state + persistence
+│   │   │   │   ├── sidebar.ts    # Filter/expand state
+│   │   │   │   └── ui.ts         # UI preferences (diff mode)
+│   │   │   ├── hooks/
+│   │   │   │   ├── useDiff.ts    # Fetch diff from backend
+│   │   │   │   └── useFileNavigation.ts  # j/k/Enter keyboard nav
 │   │   │   └── styles/
-│   │   │       └── index.css
+│   │   │       └── index.css     # All styles + GitHub Dark syntax theme
 │   │   │
 │   │   ├── src-tauri/            # Rust backend
 │   │   │   ├── src/
 │   │   │   │   ├── main.rs       # Tauri app + command registration
 │   │   │   │   └── commands/
-│   │   │   │       ├── mod.rs
-│   │   │   │       ├── session.rs    # Session CRUD, working tree detection
-│   │   │   │       ├── git.rs        # Diff fetching, caching
-│   │   │   │       └── highlight.rs  # Tree-sitter integration
-│   │   │   ├── Cargo.toml
-│   │   │   ├── Cargo.lock
-│   │   │   ├── tauri.conf.json
-│   │   │   └── capabilities/
-│   │   │       └── default.json  # Plugin permissions
+│   │   │   │       ├── session.rs    # Session CRUD, persistence, working tree
+│   │   │   │       ├── git.rs        # Diff fetching, caching, new/deleted file handling
+│   │   │   │       └── highlight.rs  # Tree-sitter with full-file context
+│   │   │   ├── icons/            # App icons (icon.png, icon.svg)
+│   │   │   └── tauri.conf.json
 │   │   └── package.json
 │   │
 │   └── shared/                   # Shared TypeScript types
 │       └── src/
 │           ├── manifest.ts       # ReviewManifest, FileEntry, RefInfo
 │           ├── state.ts          # PersistedState, FileState
-│           ├── diff.ts           # FileDiff, Hunk, DiffLine
+│           ├── diff.ts           # FileDiff, Hunk, DiffLine, HighlightSpan
 │           └── config.ts         # ReviConfig
 │
 ├── docs/
 │   ├── revi-prd.md               # Product Requirements Document
-│   └── implementation-plan.md    # Detailed phase breakdown
+│   └── implementation-plan.md    # Detailed phase breakdown (updated with Phase 12)
 │
-├── package.json                  # Workspace root
+├── package.json                  # Workspace root (pnpm dev runs desktop)
 ├── pnpm-workspace.yaml
 ├── turbo.json
 └── README.md
@@ -112,11 +126,12 @@ revi/
 ## Key Technical Decisions
 
 1. **Tauri 2** (not Tauri 1) - Newer plugin system, better API
-2. **Tree-sitter in Rust** - Fast, accurate syntax highlighting (not JS-based Shiki)
+2. **Tree-sitter in Rust with full-file context** - Highlights entire file first, then maps spans to lines for accurate token recognition
 3. **Zustand** - Simple React state management
 4. **Working Tree Support** - When uncommitted changes exist, compare HEAD vs working tree
 5. **LRU Caching** - 100-entry cache for computed diffs (skipped for working tree)
-6. **Session Manifests** - Stored in `.revi/sessions/<id>.json`
+6. **Session Persistence** - Last project saved to Tauri app data dir, auto-restored on launch
+7. **Synthetic diffs** - New files and deleted files generate proper diffs even when git returns empty
 
 ---
 
@@ -129,6 +144,9 @@ revi/
 | `create_session_from_repo` | session.rs | Create session from folder picker |
 | `save_review_state` | session.rs | Persist review state |
 | `load_review_state` | session.rs | Load persisted state |
+| `save_last_session` | session.rs | Save last project for persistence |
+| `load_last_session` | session.rs | Load last project on startup |
+| `clear_last_session` | session.rs | Clear saved project (change project) |
 | `get_file_diff` | git.rs | Fetch diff with syntax highlighting |
 | `compute_content_hash` | git.rs | SHA-256 hash of content |
 | `invalidate_diff_cache` | git.rs | Clear cache for a repo |
@@ -146,58 +164,53 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ---
 
-## How to Run
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build all packages
-pnpm build
-
-# Run desktop in dev mode
-cd packages/desktop && pnpm tauri dev
-
-# Run CLI
-pnpm revi --base main
-```
-
----
-
 ## What's Next
-
-### Phase 4: File Tree Sidebar (3-4 days)
-- Keyboard navigation (j/k to move, Enter to open)
-- Collapsible directory groups
-- Filter by status (Added/Modified/Deleted)
-- Filter by viewed state
-- Search/filter input
-
-### Phase 5: Diff Rendering (7-10 days)
-- Virtualized diff with `@tanstack/react-virtual`
-- Split view (side-by-side) and Unified view
-- Syntax highlighting from pre-computed spans
-- Hunk headers with context
-- Line number gutters
-- Word-level diff highlighting
-- Handle new/deleted/renamed/binary files
 
 ### Phase 6: State Management (4-5 days)
 - Persist viewed files, scroll positions
 - Fuzzy recovery after rebase/amend (content hash matching)
 - "Changed since last view" badges
 
-### Phase 7+: See `docs/implementation-plan.md`
+### Phase 7: Keyboard Navigation (2-3 days)
+- Full keybinding system (n/p for next/prev file, etc.)
+- Command palette
+- Visual feedback on navigation
+
+### Phase 8: File Interactions (2-3 days)
+- Open file in editor (Cmd+O)
+- Copy file path
+- Collapse/expand hunks
+
+### Phase 9: Change Detection (3-4 days)
+- File watcher for live updates
+- Refresh flow with state preservation
+
+### Phase 10: Polish & Config (3-4 days)
+- Exclusion patterns (.gitignore-style)
+- Whitespace toggle
+- Config file loading
+
+### Phase 11: MVP Comments & AI Export (3-4 days)
+- Line comments on diff
+- "Copy Comments for AI" button
+- Markdown export
+
+### Phase 12: Multi-Window Management (3-4 days) - NEW
+- Multiple windows for different projects
+- Window state restoration
+- "File > New Window" menu
+
+See `docs/implementation-plan.md` for full task breakdown.
 
 ---
 
 ## Known Issues / Notes
 
-1. **Diff pane is a placeholder** - Shows file info but no actual diff yet (Phase 5)
-2. **No keyboard shortcuts yet** - Phase 7
-3. **App launcher in CLI** - Just prints instructions, doesn't spawn app
+1. **Viewed files not persisted yet** - Phase 6 will add this
+2. **No keyboard shortcuts beyond j/k** - Phase 7 adds full keybinding system
+3. **App launcher in CLI** - Just prints instructions, doesn't spawn app yet
 4. **TOML highlighting disabled** - tree-sitter-toml 0.20 incompatible with tree-sitter 0.24
-5. **Continuous scroll mode** - Not in current plan (single-file view with j/k navigation). Could be added as Phase 5b or later.
+5. **Single window only** - Phase 12 will add multi-window support
 
 ---
 
@@ -205,17 +218,18 @@ pnpm revi --base main
 
 1. `docs/implementation-plan.md` - Full roadmap with task lists
 2. `docs/revi-prd.md` - Product requirements and UX specs
-3. `packages/desktop/src-tauri/src/commands/git.rs` - Core diff logic
-4. `packages/desktop/src-tauri/src/commands/session.rs` - Session creation
-5. `packages/desktop/src/App.tsx` - Main React app
-6. `packages/desktop/src/stores/session.ts` - Session state management
+3. `packages/desktop/src-tauri/src/commands/git.rs` - Core diff logic + highlighting
+4. `packages/desktop/src-tauri/src/commands/highlight.rs` - Tree-sitter with full-file context
+5. `packages/desktop/src/App.tsx` - Main React app with session persistence
+6. `packages/desktop/src/stores/session.ts` - Session state + Tauri calls
+7. `packages/desktop/src/components/diff/` - Diff rendering components
 
 ---
 
 ## User Preferences
 
 From `.claude/CLAUDE.md`:
-- Do NOT run tests automatically — always ask first
+- Do NOT run tests automatically - always ask first
 - Do NOT run build/compile commands without approval
 - Minimize shell command execution
 - Focus on reading and writing code only
@@ -225,8 +239,13 @@ From `.claude/CLAUDE.md`:
 
 ## Recommended Next Step
 
-Start **Phase 4: File Tree Sidebar** or **Phase 5: Diff Rendering** based on priority:
-- Phase 4 adds keyboard navigation and filtering (smaller scope)
-- Phase 5 implements the actual diff viewer (larger scope, core feature)
+Start **Phase 6: State Management** to persist viewed files and add recovery features:
+
+1. Extend `PersistedState` in the frontend store
+2. Call `save_review_state` / `load_review_state` Tauri commands
+3. Add "viewed" checkmarks to file list
+4. Implement content hash comparison for fuzzy recovery
+
+Alternatively, **Phase 7: Keyboard Navigation** is a good smaller scope if you want quicker wins.
 
 To continue, read the implementation plan and the current component code, then implement the next phase incrementally.

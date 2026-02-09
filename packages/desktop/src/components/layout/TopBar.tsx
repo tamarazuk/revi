@@ -1,7 +1,11 @@
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 
-export function TopBar() {
+interface TopBarProps {
+  onChangeProject?: () => void;
+}
+
+export function TopBar({ onChangeProject }: TopBarProps) {
   const { session } = useSessionStore();
   const { diffMode, toggleDiffMode } = useUIStore();
 
@@ -35,6 +39,16 @@ export function TopBar() {
         >
           {diffMode === 'split' ? 'Split' : 'Unified'}
         </button>
+
+        {onChangeProject && (
+          <button
+            className="top-bar__change-project"
+            onClick={onChangeProject}
+            title="Open a different project"
+          >
+            Change Project
+          </button>
+        )}
       </div>
     </header>
   );

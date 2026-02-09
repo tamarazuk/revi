@@ -185,6 +185,21 @@ body {
   background: var(--bg-primary);
 }
 
+.top-bar__change-project {
+  padding: 0.25rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.top-bar__change-project:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 /* Sidebar */
 .sidebar {
   display: flex;

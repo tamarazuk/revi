@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import type { ReviewManifest } from '@revi/shared';
 
+interface LastSession {
+  repoPath: string;
+  baseRef: string | null;
+  savedAt: string;
+}
+
 interface SessionState {
   session: ReviewManifest | null;
   sessionPath: string | null;
@@ -12,6 +18,8 @@ interface SessionState {
   // Actions
   loadSession: (path: string) => Promise<void>;
   loadSessionFromRepo: (repoPath: string, baseRef?: string) => Promise<void>;
+  loadLastSession: () => Promise<boolean>;
+  clearSession: () => Promise<void>;
   selectFile: (path: string) => void;
   selectNextFile: () => void;
   selectPrevFile: () => void;
@@ -55,6 +63,12 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         baseRef: baseRef || null 
       });
 
+      // Save this as the last session for persistence
+      await invoke('save_last_session', {
+        repoPath,
+        baseRef: baseRef || null,
+      });
+
       set({
         session: manifest,
         sessionPath: null, // Created in-memory, path is in .revi/sessions/
@@ -67,6 +81,52 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  loadLastSession: async () => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const lastSession = await invoke<LastSession | null>('load_last_session');
+
+      if (!lastSession) {
+        set({ isLoading: false });
+        return false;
+      }
+
+      // Try to load the session from the saved repo path
+      const manifest = await invoke<ReviewManifest>('create_session_from_repo', {
+        repoPath: lastSession.repoPath,
+        baseRef: lastSession.baseRef,
+      });
+
+      set({
+        session: manifest,
+        sessionPath: null,
+        selectedFile: manifest.files[0]?.path || null,
+        isLoading: false,
+      });
+
+      return true;
+    } catch (error) {
+      // If loading fails, clear the saved session and show picker
+      await invoke('clear_last_session').catch(() => {});
+      set({
+        error: null, // Don't show error, just show picker
+        isLoading: false,
+      });
+      return false;
+    }
+  },
+
+  clearSession: async () => {
+    await invoke('clear_last_session').catch(() => {});
+    set({
+      session: null,
+      sessionPath: null,
+      selectedFile: null,
+      error: null,
+    });
   },
 
   selectFile: (path: string) => {
