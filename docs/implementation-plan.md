@@ -792,17 +792,17 @@ fn list_recent_commits(
 
 ### Tasks
 
-- [ ] Add `ComparisonMode` type to shared package
-- [ ] Extend `ReviewManifest` to include `comparisonMode` field
-- [ ] Modify `create_session_from_repo` to accept mode parameter
-- [ ] Implement `list_branches` Tauri command
-- [ ] Implement `list_recent_commits` Tauri command (for custom ref picker)
-- [ ] Create `ComparisonModeDropdown` component
-- [ ] Create `CustomComparisonModal` with branch/commit picker
-- [ ] Update TopBar to show current mode with dropdown
+- [x] Add `ComparisonMode` type to shared package
+- [x] Extend `ReviewManifest` to include `comparisonMode` field
+- [x] Modify `create_session_from_repo` to accept mode parameter
+- [x] Implement `list_branches` Tauri command
+- [x] Implement `list_recent_commits` Tauri command (for custom ref picker)
+- [x] Create `ComparisonModeDropdown` component
+- [x] Create `CustomComparisonModal` with branch/commit picker
+- [x] Update TopBar to show current mode with dropdown
 - [ ] Persist last-used mode per repository
-- [ ] Handle mode switching (reload session with new mode)
-- [ ] Show clear indication when viewing uncommitted vs branch changes
+- [x] Handle mode switching (reload session with new mode)
+- [x] Show clear indication when viewing uncommitted vs branch changes
 
 ### UX Details
 

@@ -5,6 +5,8 @@ export type {
   WorktreeInfo,
   FileEntry,
   FileStatus,
+  ComparisonMode,
+  CommitInfo,
 } from './manifest';
 
 // State types

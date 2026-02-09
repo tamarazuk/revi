@@ -30,6 +30,7 @@
 | **Phase 5** | Done | Diff rendering (unified/split views, syntax highlighting) |
 | **Session Persistence** | Done | Auto-restore last project on app relaunch |
 | **Phase 6** | Done | State management (viewed files, persistence, progress tracking) |
+| **Phase 6b** | Done | Comparison mode switcher (uncommitted/branch/custom) |
 
 ### Recent Git History
 
@@ -167,15 +168,7 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ## What's Next
 
-### Phase 6b: Comparison Mode Switcher (2-3 days) - RECOMMENDED NEXT
-- Dropdown in TopBar to switch between comparison modes:
-  - **Uncommitted Changes** (HEAD vs Working Tree)
-  - **Branch Changes** (main..HEAD)
-  - **Custom** (pick refs)
-- List branches and recent commits for custom selection
-- Persist last-used mode per repository
-
-### Phase 7: Keyboard Navigation (2-3 days)
+### Phase 7: Keyboard Navigation (2-3 days) - RECOMMENDED NEXT
 - Full keybinding system (n/p for next/prev file, etc.)
 - Command palette
 - Visual feedback on navigation
@@ -210,11 +203,11 @@ See `docs/implementation-plan.md` for full task breakdown.
 
 ## Known Issues / Notes
 
-1. **Viewed files not persisted yet** - Phase 6 will add this
-2. **No keyboard shortcuts beyond j/k** - Phase 7 adds full keybinding system
-3. **App launcher in CLI** - Just prints instructions, doesn't spawn app yet
-4. **TOML highlighting disabled** - tree-sitter-toml 0.20 incompatible with tree-sitter 0.24
-5. **Single window only** - Phase 12 will add multi-window support
+1. **No keyboard shortcuts beyond j/k/v** - Phase 7 adds full keybinding system
+2. **App launcher in CLI** - Just prints instructions, doesn't spawn app yet
+3. **TOML highlighting disabled** - tree-sitter-toml 0.20 incompatible with tree-sitter 0.24
+4. **Single window only** - Phase 12 will add multi-window support
+5. **Comparison mode persistence** - Last-used mode not yet persisted per repository
 
 ---
 
@@ -243,16 +236,17 @@ From `.claude/CLAUDE.md`:
 
 ## Recommended Next Step
 
-Start **Phase 6b: Comparison Mode Switcher** to let users switch between:
-- Uncommitted changes (HEAD vs working tree)
-- Branch changes (main..HEAD) 
-- Custom comparison (pick base/head refs)
+Start **Phase 7: Keyboard Navigation** to add full keybinding system:
+- Implement n/p for next/prev hunk navigation
+- Add command palette (Cmd+K or ?)
+- Add `[` / `]` for collapse/expand hunks
+- Add visual feedback on navigation actions
 
 Key implementation steps:
-1. Add `ComparisonMode` type to shared package
-2. Add `list_branches` and `list_recent_commits` Tauri commands
-3. Create `ComparisonModeDropdown` component in TopBar
-4. Modify session creation to accept mode parameter
-5. Handle mode switching and persistence
+1. Create keyboard event handler hook
+2. Implement action dispatcher
+3. Load custom keybindings from config
+4. Create keyboard help overlay (`?`)
+5. Implement all default actions
 
-To continue, read the implementation plan (`docs/implementation-plan.md` Phase 6b section) and start with the shared types.
+See `docs/implementation-plan.md` Phase 7 section for full details.

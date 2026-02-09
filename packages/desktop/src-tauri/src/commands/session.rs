@@ -51,6 +51,8 @@ pub struct ReviewManifest {
     pub files: Vec<FileEntry>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "comparisonMode")]
+    pub comparison_mode: Option<ComparisonMode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -126,6 +128,37 @@ pub struct UiState {
     pub sidebar_visible: bool,
 }
 
+/// Comparison mode for review sessions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum ComparisonMode {
+    /// HEAD vs Working Tree (staged + unstaged + untracked)
+    Uncommitted,
+    /// merge-base(baseBranch)..HEAD
+    Branch {
+        #[serde(rename = "baseBranch")]
+        base_branch: String,
+    },
+    /// Custom ref comparison
+    Custom {
+        #[serde(rename = "baseRef")]
+        base_ref: String,
+        #[serde(rename = "headRef")]
+        head_ref: String,
+    },
+}
+
+/// Information about a git commit
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitInfo {
+    pub sha: String,
+    #[serde(rename = "shortSha")]
+    pub short_sha: String,
+    pub message: String,
+    pub author: String,
+    pub date: String,
+}
+
 #[tauri::command]
 pub fn load_session(path: String) -> Result<ReviewManifest, String> {
     let content =
@@ -185,6 +218,7 @@ pub fn load_review_state(
 pub fn create_session_from_repo(
     repo_path: String,
     base_ref: Option<String>,
+    mode: Option<ComparisonMode>,
 ) -> Result<ReviewManifest, String> {
     // Verify it's a git repository
     let repo_root = get_repo_root(&repo_path)?;
@@ -192,52 +226,70 @@ pub fn create_session_from_repo(
     // Get current branch (for display purposes)
     let current_branch = get_current_branch(&repo_root);
 
-    // First, check if there are uncommitted changes
+    // If mode is explicitly provided, use it
+    if let Some(comparison_mode) = mode {
+        return create_session_with_mode(&repo_root, comparison_mode, current_branch);
+    }
+
+    // Auto-detect mode: check if there are uncommitted changes
     let has_uncommitted = has_uncommitted_changes(&repo_root)?;
 
     if has_uncommitted {
         // Show uncommitted changes: HEAD vs working tree
-        let base = get_ref_info(&repo_root, "HEAD")?;
-
-        // Use a special marker for working tree
-        let head = RefInfo {
-            ref_name: "Working Tree".to_string(),
-            sha: "WORKING_TREE".to_string(),
-        };
-
-        // Get uncommitted file changes
-        let files = get_uncommitted_files(&repo_root)?;
-
-        // Generate session ID
-        let session_id = nanoid!(12);
-
-        // Create manifest
-        let manifest = ReviewManifest {
-            version: 1,
-            session_id: session_id.clone(),
-            repo_root: repo_root.clone(),
-            base,
-            head,
-            worktree: None,
-            files,
-            created_at: Utc::now().to_rfc3339(),
-        };
-
-        // Write manifest to .revi/sessions/
-        write_manifest(&repo_root, &session_id, &manifest)?;
-
-        return Ok(manifest);
+        create_session_with_mode(&repo_root, ComparisonMode::Uncommitted, current_branch)
+    } else {
+        // No uncommitted changes - fall back to comparing commits (branch mode)
+        // Use provided base_ref or auto-detect
+        let base_branch = base_ref.unwrap_or_else(|| detect_default_base_branch(&repo_root));
+        create_session_with_mode(
+            &repo_root,
+            ComparisonMode::Branch {
+                base_branch: base_branch,
+            },
+            current_branch,
+        )
     }
+}
 
-    // No uncommitted changes - fall back to comparing commits
-    // Resolve base ref (use provided, or find merge-base with main/master)
-    let base = resolve_base_ref(&repo_root, base_ref)?;
-
-    // Get HEAD info
-    let head = get_ref_info(&repo_root, "HEAD")?;
-
-    // Get changed files between commits
-    let files = get_changed_files(&repo_root, &base.sha, &head.sha)?;
+/// Create a session with an explicit comparison mode
+fn create_session_with_mode(
+    repo_root: &str,
+    mode: ComparisonMode,
+    current_branch: Option<String>,
+) -> Result<ReviewManifest, String> {
+    let (base, head, files, comparison_mode) = match &mode {
+        ComparisonMode::Uncommitted => {
+            let base = get_ref_info(repo_root, "HEAD")?;
+            let head = RefInfo {
+                ref_name: "Working Tree".to_string(),
+                sha: "WORKING_TREE".to_string(),
+            };
+            let files = get_uncommitted_files(repo_root)?;
+            (base, head, files, mode)
+        }
+        ComparisonMode::Branch { base_branch } => {
+            // Get merge-base with the specified branch
+            let base = match get_merge_base(repo_root, base_branch) {
+                Ok(merge_base_sha) => RefInfo {
+                    ref_name: base_branch.clone(),
+                    sha: merge_base_sha,
+                },
+                Err(_) => {
+                    // Fallback: try to resolve the branch directly
+                    get_ref_info(repo_root, base_branch)?
+                }
+            };
+            let head = get_ref_info(repo_root, "HEAD")?;
+            let files = get_changed_files(repo_root, &base.sha, &head.sha)?;
+            (base, head, files, mode)
+        }
+        ComparisonMode::Custom { base_ref, head_ref } => {
+            let base = get_ref_info(repo_root, base_ref)?;
+            let head = get_ref_info(repo_root, head_ref)?;
+            let files = get_changed_files(repo_root, &base.sha, &head.sha)?;
+            (base, head, files, mode)
+        }
+    };
 
     // Generate session ID
     let session_id = nanoid!(12);
@@ -246,21 +298,33 @@ pub fn create_session_from_repo(
     let manifest = ReviewManifest {
         version: 1,
         session_id: session_id.clone(),
-        repo_root: repo_root.clone(),
+        repo_root: repo_root.to_string(),
         base,
         head,
         worktree: current_branch.map(|branch| WorktreeInfo {
-            path: repo_root.clone(),
+            path: repo_root.to_string(),
             branch,
         }),
         files,
         created_at: Utc::now().to_rfc3339(),
+        comparison_mode: Some(comparison_mode),
     };
 
     // Write manifest to .revi/sessions/
-    write_manifest(&repo_root, &session_id, &manifest)?;
+    write_manifest(repo_root, &session_id, &manifest)?;
 
     Ok(manifest)
+}
+
+/// Detect the default base branch (main, master, or fallback)
+fn detect_default_base_branch(repo_root: &str) -> String {
+    for branch in &["main", "master", "origin/main", "origin/master"] {
+        if get_merge_base(repo_root, branch).is_ok() {
+            return branch.to_string();
+        }
+    }
+    // Fallback
+    "HEAD~10".to_string()
 }
 
 fn get_repo_root(path: &str) -> Result<String, String> {
@@ -668,4 +732,108 @@ pub fn clear_last_session(app: AppHandle) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// List all local and remote branches in the repository
+#[tauri::command]
+pub fn list_branches(repo_root: String) -> Result<Vec<String>, String> {
+    // Get all local branches
+    let local_output = Command::new("git")
+        .args(["branch", "--format=%(refname:short)"])
+        .current_dir(&repo_root)
+        .output()
+        .map_err(|e| format!("Failed to list local branches: {}", e))?;
+
+    let mut branches: Vec<String> = Vec::new();
+
+    if local_output.status.success() {
+        let stdout = String::from_utf8_lossy(&local_output.stdout);
+        for line in stdout.lines() {
+            let branch = line.trim();
+            if !branch.is_empty() {
+                branches.push(branch.to_string());
+            }
+        }
+    }
+
+    // Get remote branches (without remote/ prefix for common ones)
+    let remote_output = Command::new("git")
+        .args(["branch", "-r", "--format=%(refname:short)"])
+        .current_dir(&repo_root)
+        .output()
+        .map_err(|e| format!("Failed to list remote branches: {}", e))?;
+
+    if remote_output.status.success() {
+        let stdout = String::from_utf8_lossy(&remote_output.stdout);
+        for line in stdout.lines() {
+            let branch = line.trim();
+            // Skip HEAD pointer and add remote branches
+            if !branch.is_empty() && !branch.ends_with("/HEAD") {
+                // Only add if not already present as local branch
+                if !branches.contains(&branch.to_string()) {
+                    branches.push(branch.to_string());
+                }
+            }
+        }
+    }
+
+    // Sort: local branches first (no /), then remote branches, alphabetically within each group
+    branches.sort_by(|a, b| {
+        let a_is_remote = a.contains('/');
+        let b_is_remote = b.contains('/');
+        if a_is_remote != b_is_remote {
+            // Local branches first
+            a_is_remote.cmp(&b_is_remote)
+        } else {
+            a.cmp(b)
+        }
+    });
+
+    Ok(branches)
+}
+
+/// List recent commits in the repository
+#[tauri::command]
+pub fn list_recent_commits(repo_root: String, count: u32) -> Result<Vec<CommitInfo>, String> {
+    let output = Command::new("git")
+        .args([
+            "log",
+            &format!("-{}", count),
+            "--format=%H%n%h%n%s%n%an%n%aI%n---",
+        ])
+        .current_dir(&repo_root)
+        .output()
+        .map_err(|e| format!("Failed to list commits: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to get commit history".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut commits = Vec::new();
+
+    // Parse commits - each commit is 5 lines followed by "---"
+    let lines: Vec<&str> = stdout.lines().collect();
+    let mut i = 0;
+
+    while i + 4 < lines.len() {
+        let sha = lines[i].trim().to_string();
+        let short_sha = lines[i + 1].trim().to_string();
+        let message = lines[i + 2].trim().to_string();
+        let author = lines[i + 3].trim().to_string();
+        let date = lines[i + 4].trim().to_string();
+
+        commits.push(CommitInfo {
+            sha,
+            short_sha,
+            message,
+            author,
+            date,
+        });
+
+        // Skip to next commit (5 data lines + 1 separator)
+        i += 6;
+    }
+
+    Ok(commits)
 }

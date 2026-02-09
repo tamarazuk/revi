@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import type { ReviewManifest } from '@revi/shared';
+import type { ReviewManifest, ComparisonMode } from '@revi/shared';
 
 interface LastSession {
   repoPath: string;
@@ -18,6 +18,7 @@ interface SessionState {
   // Actions
   loadSession: (path: string) => Promise<void>;
   loadSessionFromRepo: (repoPath: string, baseRef?: string) => Promise<void>;
+  loadSessionWithMode: (repoPath: string, mode: ComparisonMode) => Promise<void>;
   loadLastSession: () => Promise<boolean>;
   clearSession: () => Promise<void>;
   selectFile: (path: string) => void;
@@ -60,7 +61,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       // Create a new session from the repository
       const manifest = await invoke<ReviewManifest>('create_session_from_repo', { 
         repoPath, 
-        baseRef: baseRef || null 
+        baseRef: baseRef || null,
+        mode: null,
       });
 
       // Save this as the last session for persistence
@@ -72,6 +74,37 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({
         session: manifest,
         sessionPath: null, // Created in-memory, path is in .revi/sessions/
+        selectedFile: manifest.files[0]?.path || null,
+        isLoading: false,
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        isLoading: false,
+      });
+    }
+  },
+
+  loadSessionWithMode: async (repoPath: string, mode: ComparisonMode) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      // Create a new session with the specified mode
+      const manifest = await invoke<ReviewManifest>('create_session_from_repo', { 
+        repoPath, 
+        baseRef: null,
+        mode,
+      });
+
+      // Save this as the last session for persistence
+      await invoke('save_last_session', {
+        repoPath,
+        baseRef: null,
+      });
+
+      set({
+        session: manifest,
+        sessionPath: null,
         selectedFile: manifest.files[0]?.path || null,
         isLoading: false,
       });
@@ -98,6 +131,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       const manifest = await invoke<ReviewManifest>('create_session_from_repo', {
         repoPath: lastSession.repoPath,
         baseRef: lastSession.baseRef,
+        mode: null,
       });
 
       set({

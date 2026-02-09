@@ -1,19 +1,33 @@
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useReviewStateStore } from '../../stores/reviewState';
+import { ComparisonModeDropdown } from '../topbar/ComparisonModeDropdown';
+import type { ComparisonMode } from '@revi/shared';
 
 interface TopBarProps {
   onChangeProject?: () => void;
 }
 
 export function TopBar({ onChangeProject }: TopBarProps) {
-  const { session } = useSessionStore();
+  const { session, loadSessionWithMode } = useSessionStore();
   const { diffMode, toggleDiffMode } = useUIStore();
   const viewedCount = useReviewStateStore((state) => state.getViewedCount());
 
   if (!session) return null;
 
   const totalCount = session.files.length;
+  const currentMode = session.comparisonMode;
+  
+  // Detect if we're currently viewing uncommitted changes
+  const isUncommittedMode = session.head.sha === 'WORKING_TREE';
+  
+  // For now, assume uncommitted changes exist if we're in uncommitted mode
+  // In a real implementation, we'd query the backend
+  const hasUncommittedChanges = isUncommittedMode || session.files.length > 0;
+
+  const handleModeChange = (mode: ComparisonMode) => {
+    loadSessionWithMode(session.repoRoot, mode);
+  };
 
   return (
     <header className="top-bar">
@@ -23,12 +37,21 @@ export function TopBar({ onChangeProject }: TopBarProps) {
           <span className="dim"> ({session.base.sha.slice(0, 7)})</span>
           {' → '}
           {session.head.ref}
-          <span className="dim"> ({session.head.sha.slice(0, 7)})</span>
+          {session.head.sha !== 'WORKING_TREE' && (
+            <span className="dim"> ({session.head.sha.slice(0, 7)})</span>
+          )}
         </span>
         <span className="top-bar__repo dim">{session.repoRoot}</span>
       </div>
 
       <div className="top-bar__actions">
+        <ComparisonModeDropdown
+          currentMode={currentMode}
+          hasUncommittedChanges={hasUncommittedChanges}
+          repoRoot={session.repoRoot}
+          onModeChange={handleModeChange}
+        />
+
         <span className="top-bar__progress">
           {viewedCount} / {totalCount} files viewed
         </span>

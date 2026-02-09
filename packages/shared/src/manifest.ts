@@ -11,6 +11,7 @@ export interface ReviewManifest {
   worktree?: WorktreeInfo;
   files: FileEntry[];
   createdAt: string;
+  comparisonMode?: ComparisonMode; // Added in Phase 6b
 }
 
 export interface RefInfo {
@@ -33,3 +34,22 @@ export interface FileEntry {
 }
 
 export type FileStatus = 'added' | 'modified' | 'deleted' | 'renamed';
+
+/**
+ * Comparison Mode - determines what is being compared in the review
+ */
+export type ComparisonMode =
+  | { type: 'uncommitted' } // HEAD vs Working Tree (staged + unstaged + untracked)
+  | { type: 'branch'; baseBranch: string } // merge-base(baseBranch)..HEAD
+  | { type: 'custom'; baseRef: string; headRef: string }; // Custom ref comparison
+
+/**
+ * Commit info for listing recent commits
+ */
+export interface CommitInfo {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  date: string;
+}

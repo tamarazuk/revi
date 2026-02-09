@@ -19,6 +19,8 @@ fn main() {
             session::save_last_session,
             session::load_last_session,
             session::clear_last_session,
+            session::list_branches,
+            session::list_recent_commits,
             git::get_file_diff,
             git::compute_content_hash,
             git::invalidate_diff_cache,
