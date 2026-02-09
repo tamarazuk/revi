@@ -19,8 +19,9 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 8 | File Interactions | 2-3 days | Open in editor, copy, collapse controls |
 | 9 | Change Detection | 3-4 days | File watcher, refresh flow |
 | 10 | Polish & Config | 3-4 days | Exclusions, whitespace toggle, config loading |
+| 11 | MVP Comments & AI Export | 3-4 days | Line comments with AI-friendly markdown export |
 
-**Total estimated time: 5-7 weeks**
+**Total estimated time: 6-8 weeks**
 
 ---
 
@@ -952,7 +953,92 @@ function filterFiles(files: FileEntry[], exclude: string[]): FileEntry[] {
 - [ ] Accessibility audit (focus management, ARIA)
 
 ### Deliverable
-Complete MVP with all features from Section 22 of the PRD.
+Complete MVP with all features from Section 23 of the PRD.
+
+---
+
+## Phase 11: MVP Comments & AI Export
+
+### Goal
+Add lightweight line-level comments with one-click AI-friendly export.
+
+### Storage Schema Extension
+
+Comments extend the existing `PersistedState`:
+
+```typescript
+interface Comment {
+  id: string;
+  filePath: string;
+  lineNumber: number;
+  content: string;
+  createdAt: string;
+}
+
+// Added to PersistedState
+interface PersistedState {
+  // ... existing fields
+  comments: Comment[];
+}
+```
+
+### Components
+
+```
+components/
+├── comments/
+│   └── CommentInput.tsx      # Popover for adding/editing comment
+└── sidebar/
+    └── CopyCommentsButton.tsx # "Copy Comments for AI" button
+```
+
+### Tauri Commands
+
+```rust
+#[tauri::command]
+fn generate_comments_markdown(comments: Vec<Comment>) -> String {
+    // Group by file, format as markdown
+    // Returns formatted string ready for clipboard
+}
+```
+
+### Export Format
+
+```markdown
+## Review Feedback
+
+### src/utils/parser.ts
+- Line 45: This null check is unsafe in async paths. Fix defensively.
+- Line 89: Consider using a Map instead of object here.
+
+### src/components/Button.tsx
+- Line 12: Rename `onClick` prop to `onPress` for consistency.
+```
+
+### Tasks
+
+- [ ] Extend `PersistedState` schema to include `comments` array
+- [ ] Add comment input popover (appears on line gutter click or `c` key)
+- [ ] Implement add/edit/delete comment actions
+- [ ] Persist comments in state file (reuse existing save mechanism)
+- [ ] Add "Copy Comments for AI" button in sidebar
+- [ ] Implement `generate_comments_markdown` function
+- [ ] Copy formatted markdown directly to clipboard on button click
+- [ ] Add keyboard shortcut `Cmd+Shift+E` for quick export
+- [ ] Handle line number drift: show warning badge if line content changed
+- [ ] Clear comments option (for starting fresh)
+
+### Line Number Drift Strategy
+
+When the diff changes (refresh after new commit), comments may reference stale line numbers:
+
+- **v1.75 approach (simple)**: Keep comment attached to stored line number
+- Show warning badge on comment if line content at that number has changed significantly
+- User can manually update or delete stale comments
+- **Future (v2)**: Content anchoring — store surrounding context to find new location
+
+### Deliverable
+Can add comments on diff lines, click sidebar button to copy all as markdown for AI agents.
 
 ---
 
@@ -987,7 +1073,7 @@ Complete MVP with all features from Section 22 of the PRD.
 
 ---
 
-## Definition of Done (MVP)
+## Definition of Done (MVP + v1.75)
 
 - [ ] `revi .` generates manifest and launches app
 - [ ] App shows changed files with status and stats
@@ -1005,3 +1091,7 @@ Complete MVP with all features from Section 22 of the PRD.
 - [ ] Open in editor works
 - [ ] Copy file path works
 - [ ] Performance acceptable for 100+ file changesets
+- [ ] Can add comments on diff lines
+- [ ] "Copy Comments for AI" button copies markdown to clipboard
+- [ ] Comments persist in state file
+- [ ] Line drift shows warning badge when content changed

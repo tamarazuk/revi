@@ -428,7 +428,72 @@ Displayed as a subtle background tint or icon in the sidebar. Non-blocking, info
 
 ---
 
-## 17. Local Comments (v2)
+## 17. MVP Comments & AI Export (v1.75)
+
+### Purpose
+A lightweight comment system for capturing review feedback with a focus on AI-assisted workflows. Comments are local-only, stored in `.revi/state/`, and can be exported as markdown for use with AI coding agents.
+
+This is an intentionally minimal implementation — no inline rendering, no resolve/unresolve states. Section 18 (Local Comments v2) extends this with richer UX.
+
+### UX
+- Click a line number gutter (or press `c`) to add a comment
+- Comment input appears as a small popover near the line
+- Comments are stored but not rendered inline (keeps diff view clean)
+- Sidebar shows a **"Copy Comments for AI"** button
+- Clicking the button immediately copies all comments to clipboard as formatted markdown
+
+### Export Format
+
+```markdown
+## Review Feedback
+
+### src/utils/parser.ts
+- Line 45: This null check is unsafe in async paths. Fix defensively.
+- Line 89: Consider using a Map instead of object here.
+
+### src/components/Button.tsx
+- Line 12: Rename `onClick` prop to `onPress` for consistency.
+```
+
+### Storage
+
+Comments extend the existing review state schema in `.revi/state/`:
+
+```json
+{
+  "comments": [
+    {
+      "id": "abc123",
+      "filePath": "src/utils/parser.ts",
+      "lineNumber": 45,
+      "content": "This null check is unsafe in async paths. Fix defensively.",
+      "createdAt": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `c` | Add comment at current line |
+| `Cmd+Shift+E` | Copy all comments as AI instructions |
+
+### Line Number Drift
+
+When code changes after adding a comment (e.g., after a refresh following new commits), line numbers may no longer match the original context.
+
+**v1.75 approach (simple):**
+- Keep comment attached to stored line number
+- Show a warning badge on the comment if the line content has changed significantly
+- User can manually update or delete stale comments
+
+**Future (v2+):** Content anchoring — store surrounding context and attempt to find the new location automatically.
+
+---
+
+## 18. Local Comments (v2)
 
 ### Purpose
 Leave local-only comments attached to specific lines for:
@@ -446,7 +511,7 @@ Comments are stored in `.revi/state/` and **never sync to GitHub**.
 
 ---
 
-## 18. Agent-Directed Comments (v2+)
+## 19. Agent-Directed Comments (v2+)
 
 ### Concept
 Comments may be marked as **actionable** and dispatched to an AI agent (e.g., Claude, Codex).
@@ -475,7 +540,7 @@ This null check is unsafe in async paths. Fix defensively.
 
 ---
 
-## 19. Architecture
+## 20. Architecture
 
 ### Technology Stack
 
@@ -505,7 +570,7 @@ This null check is unsafe in async paths. Fix defensively.
 
 ---
 
-## 20. Configuration
+## 21. Configuration
 
 All configuration lives in `.revi/config.json`:
 
@@ -532,7 +597,7 @@ On first run, the CLI scaffolds `.revi/` and offers to add it to `.gitignore`.
 
 ---
 
-## 21. Success Metrics
+## 22. Success Metrics
 
 - Fewer fixup commits before PRs
 - Reduced draft PRs and "WIP" pushes
@@ -543,7 +608,7 @@ On first run, the CLI scaffolds `.revi/` and offers to add it to `.gitignore`.
 
 ---
 
-## 22. Scope Phasing
+## 23. Scope Phasing
 
 ### MVP
 - CLI: repo detection, base/head resolution, manifest generation, app launch
@@ -569,8 +634,13 @@ On first run, the CLI scaffolds `.revi/` and offers to add it to `.gitignore`.
 - Danger zone highlighting
 - Review summary panel
 
+### v1.75
+- MVP line-level comments (stored locally, not rendered inline)
+- "Copy Comments for AI" button in sidebar
+- One-click export of all comments as markdown for AI agents
+
 ### v2
-- Local comments (line-level, stored locally)
+- Full local comments (inline rendering, resolve/unresolve states)
 - Comment filtering in file tree
 - User-configurable review profiles
 
@@ -583,7 +653,7 @@ On first run, the CLI scaffolds `.revi/` and offers to add it to `.gitignore`.
 
 ---
 
-## 23. Positioning
+## 24. Positioning
 
 **Revi** lets you review your code locally using the same mental model as a GitHub PR — without pushing anything.
 
