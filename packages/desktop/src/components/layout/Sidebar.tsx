@@ -11,7 +11,7 @@ import type { FileEntry } from '@revi/shared';
 export function Sidebar() {
   const { session, selectedFile, selectFile } = useSessionStore();
   const { sidebarVisible, sidebarWidth } = useUIStore();
-  const { filter, expandedDirs } = useSidebarStore();
+  const { filter } = useSidebarStore();
   const { isViewed } = useReviewStateStore();
 
   // Filter files based on current filter state
@@ -69,9 +69,7 @@ export function Sidebar() {
   if (!session || !sidebarVisible) return null;
 
   const hasActiveFilters =
-    filter.status.length > 0 ||
-    filter.searchQuery !== '' ||
-    filter.viewedState !== 'all';
+    filter.status.length > 0 || filter.searchQuery !== '' || filter.viewedState !== 'all';
 
   return (
     <aside className="sidebar" style={{ width: sidebarWidth }}>
@@ -89,9 +87,7 @@ export function Sidebar() {
       <div className="sidebar__tree">
         {filteredFiles.length === 0 ? (
           <div className="sidebar__empty">
-            {hasActiveFilters
-              ? 'No files match the current filter'
-              : 'No changed files'}
+            {hasActiveFilters ? 'No files match the current filter' : 'No changed files'}
           </div>
         ) : (
           Object.entries(groupedFiles).map(([dir, files]) => (

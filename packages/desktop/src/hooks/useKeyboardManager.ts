@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useSessionStore } from '../stores/session';
 import { useUIStore } from '../stores/ui';
 import { useKeyboardStore } from '../stores/keyboard';
@@ -94,6 +95,13 @@ export function useKeyboardManager() {
           e.preventDefault();
           closeHelpOverlay();
         }
+        return;
+      }
+
+      // Cmd/Ctrl+N: open new window
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        invoke('create_window');
         return;
       }
 

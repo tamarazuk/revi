@@ -71,6 +71,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         baseRef: baseRef || null,
       });
 
+      // Persist multi-window state
+      await invoke('save_window_states').catch(() => {});
+
       set({
         session: manifest,
         sessionPath: null, // Created in-memory, path is in .revi/sessions/
@@ -101,6 +104,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         repoPath,
         baseRef: null,
       });
+
+      // Persist multi-window state
+      await invoke('save_window_states').catch(() => {});
 
       set({
         session: manifest,

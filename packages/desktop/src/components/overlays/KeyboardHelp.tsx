@@ -30,6 +30,12 @@ const SHORTCUT_GROUPS = [
       { keys: ['Esc'], label: 'Close overlay' },
     ],
   },
+  {
+    title: 'Window',
+    shortcuts: [
+      { keys: ['Cmd+N'], label: 'New window' },
+    ],
+  },
 ];
 
 export function KeyboardHelp() {

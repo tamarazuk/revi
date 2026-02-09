@@ -1,14 +1,11 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useReviewStateStore } from '../../stores/reviewState';
 import { ComparisonModeDropdown } from '../topbar/ComparisonModeDropdown';
 import type { ComparisonMode } from '@revi/shared';
 
-interface TopBarProps {
-  onChangeProject?: () => void;
-}
-
-export function TopBar({ onChangeProject }: TopBarProps) {
+export function TopBar() {
   const { session, loadSessionWithMode } = useSessionStore();
   const { diffMode, toggleDiffMode } = useUIStore();
   const viewedCount = useReviewStateStore((state) => state.getViewedCount());
@@ -61,15 +58,13 @@ export function TopBar({ onChangeProject }: TopBarProps) {
           {diffMode === 'split' ? 'Unified' : 'Split'}
         </button>
 
-        {onChangeProject && (
-          <button
-            className="top-bar__change-project"
-            onClick={onChangeProject}
-            title="Open a different project"
-          >
-            Change Project
-          </button>
-        )}
+        <button
+          className="top-bar__new-window"
+          onClick={() => invoke('create_window')}
+          title="Open a new window (Cmd+N)"
+        >
+          New Window
+        </button>
       </div>
     </header>
   );

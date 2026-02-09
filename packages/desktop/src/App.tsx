@@ -9,40 +9,59 @@ import { useKeyboardManager } from './hooks/useKeyboardManager';
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export function App() {
-  const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, clearSession, clearError } = useSessionStore();
+  const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, clearError } = useSessionStore();
   const { loadState: loadReviewState, reset: resetReviewState } = useReviewStateStore();
   const [isPickingFolder, setIsPickingFolder] = useState(false);
   const [initComplete, setInitComplete] = useState(false);
 
   useEffect(() => {
-    // Try to load session from CLI args, then from persisted last session
+    const currentWindow = getCurrentWebviewWindow();
+    const label = currentWindow.label;
+
     async function initSession() {
       try {
-        // First check CLI args
-        const sessionPath = await invoke<string | null>('get_session_arg');
-        if (sessionPath) {
-          await loadSession(sessionPath);
+        // On main window, check CLI args first
+        if (label === 'main') {
+          const sessionPath = await invoke<string | null>('get_session_arg');
+          if (sessionPath) {
+            await loadSession(sessionPath);
+            setInitComplete(true);
+            return;
+          }
+        }
+
+        // Check if this window has a restored session from window-states.json
+        const windowInfo = await invoke<{ repoPath?: string; baseRef?: string } | null>(
+          'get_window_session',
+          { windowLabel: label }
+        );
+
+        if (windowInfo?.repoPath) {
+          await loadSessionFromRepo(windowInfo.repoPath, windowInfo.baseRef ?? undefined);
           setInitComplete(true);
           return;
         }
 
-        // Then try to load last session
-        const loaded = await loadLastSession();
-        if (loaded) {
-          setInitComplete(true);
-          return;
+        // Fall back to legacy last-session on main window only
+        if (label === 'main') {
+          const loaded = await loadLastSession();
+          if (loaded) {
+            setInitComplete(true);
+            return;
+          }
         }
       } catch (err) {
         console.error('Failed to init session:', err);
       }
-      
+
       setInitComplete(true);
     }
-    
+
     initSession();
-  }, [loadSession, loadLastSession]);
+  }, [loadSession, loadSessionFromRepo, loadLastSession]);
 
   // Central keyboard handler — must be called unconditionally (rules of hooks)
   useKeyboardManager();
@@ -61,6 +80,23 @@ export function App() {
     }
   }, [session, loadReviewState, resetReviewState]);
 
+  // Update window title and register session with backend
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+    if (session) {
+      const parts = session.repoRoot.split('/');
+      const repoName = parts[parts.length - 1] || 'Revi';
+      currentWindow.setTitle(`${repoName} - Revi`);
+      invoke('register_window_session', {
+        windowLabel: currentWindow.label,
+        repoPath: session.repoRoot,
+        baseRef: session.base.ref ?? null,
+      });
+    } else {
+      currentWindow.setTitle('Revi');
+    }
+  }, [session]);
+
   const handleOpenRepository = async () => {
     setIsPickingFolder(true);
     try {
@@ -78,11 +114,6 @@ export function App() {
     } finally {
       setIsPickingFolder(false);
     }
-  };
-
-  const handleChangeProject = async () => {
-    await clearSession();
-    await handleOpenRepository();
   };
 
   if (!initComplete || isLoading || isPickingFolder) {
@@ -135,7 +166,7 @@ export function App() {
 
   return (
     <div className="app">
-      <TopBar onChangeProject={handleChangeProject} />
+      <TopBar />
       <div className="app__body">
         <Sidebar />
         <ErrorBoundary>

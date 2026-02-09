@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import type { DiffMode } from '@revi/shared';
+
+const windowLabel = getCurrentWebviewWindow().label;
 
 interface UIState {
   diffMode: DiffMode;
@@ -40,7 +43,7 @@ export const useUIStore = create<UIState>()(
       },
     }),
     {
-      name: 'revi-ui-state',
+      name: `revi-ui-state-${windowLabel}`,
     }
   )
 );

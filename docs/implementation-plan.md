@@ -18,11 +18,11 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 6 | State Management | 4-5 days | Persistence, fuzzy recovery, viewed state |
 | 6b | Comparison Mode Switcher | 2-3 days | Switch between uncommitted/branch/custom comparison modes |
 | 7 | Keyboard Navigation | 2-3 days | Full keybinding system |
-| 8 | File Interactions | 2-3 days | Open in editor, copy, collapse controls |
-| 9 | Change Detection | 3-4 days | File watcher, refresh flow |
-| 10 | Polish & Config | 3-4 days | Exclusions, whitespace toggle, config loading |
-| 11 | MVP Comments & AI Export | 3-4 days | Line comments with AI-friendly markdown export |
-| 12 | Multi-Window Management | 3-4 days | Multiple windows, each with independent project |
+| 8 | Multi-Window Management | 3-4 days | Multiple windows, each with independent project |
+| 9 | File Interactions | 2-3 days | Open in editor, copy, collapse controls |
+| 10 | Change Detection | 3-4 days | File watcher, refresh flow |
+| 11 | Polish & Config | 3-4 days | Exclusions, whitespace toggle, config loading |
+| 12 | MVP Comments & AI Export | 3-4 days | Line comments with AI-friendly markdown export |
 
 **Total estimated time: 6-8 weeks**
 
@@ -900,7 +900,79 @@ All keyboard shortcuts work; custom keybindings load from config.
 
 ---
 
-## Phase 8: File Interactions
+## Phase 8: Multi-Window Management
+
+### Goal
+Support multiple independent windows, each viewing a different project. Enable workflows like reviewing multiple PRs simultaneously or comparing changes across repos.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Main Process                          │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │              Window Manager                          │ │
+│  │  - Track open windows and their sessions             │ │
+│  │  - Handle window lifecycle (create, close)           │ │
+│  │  - Persist window state for restore on relaunch      │ │
+│  └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+   ┌──────────┐         ┌──────────┐         ┌──────────┐
+   │ Window 1 │         │ Window 2 │         │ Window N │
+   │ Project A│         │ Project B│         │ Project C│
+   │ (own     │         │ (own     │         │ (own     │
+   │  stores) │         │  stores) │         │  stores) │
+   └──────────┘         └──────────┘         └──────────┘
+```
+
+### Window State Model
+
+```typescript
+interface WindowState {
+  windowId: string;
+  repoPath: string;
+  baseRef: string;
+  headRef: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  selectedFile?: string;
+}
+
+interface AppState {
+  windows: WindowState[];
+  lastActiveWindowId: string;
+}
+```
+
+### Key Features
+
+1. **New Window** (Cmd+N): Opens project picker in new window
+2. **Open Recent**: Menu showing recently opened projects
+3. **Window Menu**: List of open windows with project names
+4. **Independent State**: Each window has isolated Zustand stores
+5. **Restore on Launch**: Reopen all windows from previous session
+
+### Tasks
+
+- [ ] Create Rust-side window manager to track windows
+- [ ] Implement `create_window` Tauri command with unique window ID
+- [ ] Isolate Zustand stores per window (use window ID as namespace)
+- [ ] Add "File > New Window" menu item (Cmd+N)
+- [ ] Add "File > Open Recent" submenu
+- [ ] Persist all window states to app data directory
+- [ ] Restore windows on app launch
+- [ ] Update window title to include project name
+- [ ] Handle window close (remove from state, cleanup)
+- [ ] Add Window menu showing all open projects
+
+### Deliverable
+Can open multiple windows viewing different projects, all restored on app relaunch.
+
+---
+
+## Phase 9: File Interactions
 
 ### Goal
 Implement open-in-editor, copy actions, and collapse controls.
@@ -939,7 +1011,7 @@ components/
 - [ ] Parse editor command template with placeholders
 - [ ] Implement clipboard write command
 - [ ] Add "Copy file path" action
-- [ ] Add "Copy file path + line" action  
+- [ ] Add "Copy file path + line" action
 - [ ] Add "Copy hunk as text" action
 - [ ] Implement file-level collapse in diff pane
 - [ ] Implement hunk-level collapse
@@ -952,7 +1024,7 @@ Can open files in editor, copy paths, collapse/expand hunks.
 
 ---
 
-## Phase 9: Change Detection
+## Phase 10: Change Detection
 
 ### Goal
 Detect when the repo changes and offer refresh with state preservation.
@@ -973,7 +1045,7 @@ fn start_watching(repo_root: String, app_handle: AppHandle) -> Result<(), String
             }
         }
     })?;
-    
+
     watcher.watch(Path::new(&repo_root), RecursiveMode::Recursive)?;
     Ok(())
 }
@@ -1044,7 +1116,7 @@ App detects changes, shows refresh banner, preserves state on refresh.
 
 ---
 
-## Phase 10: Polish & Configuration
+## Phase 11: Polish & Configuration
 
 ### Goal
 Implement remaining MVP features: config loading, exclusions, whitespace toggle.
@@ -1093,7 +1165,7 @@ components/
 import { minimatch } from 'minimatch';
 
 function filterFiles(files: FileEntry[], exclude: string[]): FileEntry[] {
-  return files.filter(file => 
+  return files.filter(file =>
     !exclude.some(pattern => minimatch(file.path, pattern))
   );
 }
@@ -1114,7 +1186,7 @@ Complete MVP with all features from Section 23 of the PRD.
 
 ---
 
-## Phase 11: MVP Comments & AI Export
+## Phase 12: MVP Comments & AI Export
 
 ### Goal
 Add lightweight line-level comments with one-click AI-friendly export.
@@ -1196,78 +1268,6 @@ When the diff changes (refresh after new commit), comments may reference stale l
 
 ### Deliverable
 Can add comments on diff lines, click sidebar button to copy all as markdown for AI agents.
-
----
-
-## Phase 12: Multi-Window Management
-
-### Goal
-Support multiple independent windows, each viewing a different project. Enable workflows like reviewing multiple PRs simultaneously or comparing changes across repos.
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Main Process                          │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │              Window Manager                          │ │
-│  │  - Track open windows and their sessions             │ │
-│  │  - Handle window lifecycle (create, close)           │ │
-│  │  - Persist window state for restore on relaunch      │ │
-│  └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-         │                    │                    │
-         ▼                    ▼                    ▼
-   ┌──────────┐         ┌──────────┐         ┌──────────┐
-   │ Window 1 │         │ Window 2 │         │ Window N │
-   │ Project A│         │ Project B│         │ Project C│
-   │ (own     │         │ (own     │         │ (own     │
-   │  stores) │         │  stores) │         │  stores) │
-   └──────────┘         └──────────┘         └──────────┘
-```
-
-### Window State Model
-
-```typescript
-interface WindowState {
-  windowId: string;
-  repoPath: string;
-  baseRef: string;
-  headRef: string;
-  position: { x: number; y: number };
-  size: { width: number; height: number };
-  selectedFile?: string;
-}
-
-interface AppState {
-  windows: WindowState[];
-  lastActiveWindowId: string;
-}
-```
-
-### Key Features
-
-1. **New Window** (Cmd+N): Opens project picker in new window
-2. **Open Recent**: Menu showing recently opened projects
-3. **Window Menu**: List of open windows with project names
-4. **Independent State**: Each window has isolated Zustand stores
-5. **Restore on Launch**: Reopen all windows from previous session
-
-### Tasks
-
-- [ ] Create Rust-side window manager to track windows
-- [ ] Implement `create_window` Tauri command with unique window ID
-- [ ] Isolate Zustand stores per window (use window ID as namespace)
-- [ ] Add "File > New Window" menu item (Cmd+N)
-- [ ] Add "File > Open Recent" submenu
-- [ ] Persist all window states to app data directory
-- [ ] Restore windows on app launch
-- [ ] Update window title to include project name
-- [ ] Handle window close (remove from state, cleanup)
-- [ ] Add Window menu showing all open projects
-
-### Deliverable
-Can open multiple windows viewing different projects, all restored on app relaunch.
 
 ---
 

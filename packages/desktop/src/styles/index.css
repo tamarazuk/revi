@@ -190,7 +190,7 @@ body {
   background: var(--bg-primary);
 }
 
-.top-bar__change-project {
+.top-bar__new-window {
   padding: 0.25rem 0.75rem;
   background: transparent;
   border: 1px solid var(--border-color);
@@ -200,7 +200,7 @@ body {
   font-size: 0.75rem;
 }
 
-.top-bar__change-project:hover {
+.top-bar__new-window:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }

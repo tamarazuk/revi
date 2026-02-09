@@ -3,13 +3,15 @@
 
 mod commands;
 
-use commands::{git, highlight, session};
+use commands::{git, highlight, session, window};
+use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(window::WindowManager::new())
         .invoke_handler(tauri::generate_handler![
             session::get_session_arg,
             session::load_session,
@@ -27,7 +29,51 @@ fn main() {
             git::clear_diff_cache,
             highlight::highlight_code,
             highlight::detect_language,
+            window::create_window,
+            window::register_window_session,
+            window::save_window_states,
+            window::load_window_states,
+            window::get_window_session,
         ])
+        .setup(|app| {
+            window::restore_windows(app.handle());
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            let app = window.app_handle();
+            let label = window.label().to_string();
+
+            match event {
+                tauri::WindowEvent::Moved(position) => {
+                    let manager = app.state::<window::WindowManager>();
+                    let mut windows =
+                        manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(info) = windows.get_mut(&label) {
+                        info.x = Some(position.x as f64);
+                        info.y = Some(position.y as f64);
+                    }
+                }
+                tauri::WindowEvent::Resized(size) => {
+                    let manager = app.state::<window::WindowManager>();
+                    let mut windows =
+                        manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(info) = windows.get_mut(&label) {
+                        info.width = Some(size.width as f64);
+                        info.height = Some(size.height as f64);
+                    }
+                }
+                tauri::WindowEvent::CloseRequested { .. } => {
+                    let _ = window::persist_states_sync(app);
+                }
+                tauri::WindowEvent::Destroyed => {
+                    let manager = app.state::<window::WindowManager>();
+                    let mut windows =
+                        manager.windows.lock().unwrap_or_else(|e| e.into_inner());
+                    windows.remove(&label);
+                }
+                _ => {}
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
