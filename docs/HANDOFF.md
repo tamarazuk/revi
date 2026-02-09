@@ -38,11 +38,11 @@
 ### Recent Git History
 
 ```
+aec0a54 docs: add Phase 13 (Testing) to implementation plan
+7631be0 test(desktop): add unit tests for dimension sanitization and validate on write
 c6d3915 fix(desktop): sanitize window dimensions to prevent rendering corruption
 230d074 feat(desktop): add Phosphor Icons and replace inline SVGs
 6df7838 feat(desktop): add file interactions and zoom support (Phase 9)
-705d828 feat(desktop): add multi-window management and update handoff (Phase 8)
-00daead feat(desktop): add keyboard navigation, hunk collapse, and help overlay (Phase 7)
 ```
 
 ---
