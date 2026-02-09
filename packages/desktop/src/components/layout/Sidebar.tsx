@@ -95,6 +95,7 @@ export function Sidebar() {
               key={dir || '__root__'}
               dirPath={dir}
               files={files}
+              repoRoot={session.repoRoot}
               selectedFile={selectedFile}
               onSelectFile={selectFile}
               focusedFile={selectedFile}

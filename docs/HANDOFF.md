@@ -33,10 +33,12 @@
 | **Phase 6b** | Done | Comparison mode switcher (uncommitted/branch/custom) |
 | **Phase 7** | Done | Keyboard navigation, hunk collapse, help overlay |
 | **Phase 8** | Done | Multi-window management (Cmd+N, window state persistence, restore) |
+| **Phase 9** | Done | File interactions (open in editor, copy path, context menu) |
 
 ### Recent Git History
 
 ```
+(pending commit) feat(desktop): add file interactions (Phase 9)
 (pending commit) feat(desktop): add multi-window management (Phase 8)
 00daead feat(desktop): add keyboard navigation, hunk collapse, and help overlay (Phase 7)
 20c0668 fix: address 20 codebase review issues across security, correctness, and quality
@@ -202,6 +204,8 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `?` | Toggle help overlay |
 | `Escape` | Close help overlay |
 | `Cmd+N` / `Ctrl+N` | New window |
+| `Cmd+Shift+O` | Open file in editor |
+| `Cmd+Shift+C` | Copy file path |
 
 **Implementation**: Single `useKeyboardManager` hook in `App.tsx` attaches one global `keydown` listener. Shortcuts are blocked when typing in inputs or when the help overlay is open (only `?`/`Escape` pass through). Hunk navigation uses a `useDiffNavigation` hook in each diff view that registers a scroll callback with the `keyboard` store.
 
@@ -232,6 +236,8 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `save_window_states` | window.rs | Persist all window states to disk |
 | `load_window_states` | window.rs | Load persisted window states |
 | `get_window_session` | window.rs | Get saved session info for a window |
+| `open_in_editor` | file_ops.rs | Open file in default/configured editor |
+| `copy_to_clipboard` | file_ops.rs | Copy text to system clipboard |
 
 ---
 
@@ -243,14 +249,35 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ---
 
+## Phase 9: File Interactions (Completed)
+
+### What was built
+
+**Rust (`file_ops.rs`)**:
+- `open_in_editor` — Opens file in user's editor (respects `$VISUAL`/`$EDITOR` env vars, falls back to system default via `open -t` on macOS)
+- `copy_to_clipboard` — Copies text to system clipboard using `tauri-plugin-clipboard-manager`
+- Smart editor detection: handles VS Code (`code -g file:line`), Vim/Neovim (`+line file`), and others
+
+**Frontend**:
+- `useKeyboardManager.ts` — Added `Cmd+Shift+O` (open in editor) and `Cmd+Shift+C` (copy path) shortcuts
+- `ContextMenu.tsx` — New reusable context menu component with keyboard dismiss support
+- `FileTreeItem.tsx` — Right-click context menu with "Open in Editor" and "Copy Path" options
+- `KeyboardHelp.tsx` — Added new shortcuts to help overlay
+
+**Capabilities**:
+- Added `shell:allow-spawn` and `clipboard-manager:allow-write-text` permissions
+
+### How it works
+
+1. **Keyboard shortcut**: With a file selected, press `Cmd+Shift+O` to open in editor or `Cmd+Shift+C` to copy absolute path
+2. **Context menu**: Right-click any file in the sidebar to see options with shortcuts displayed
+3. **Editor detection**: Checks `$VISUAL` → `$EDITOR` → system default. Supports line numbers for VS Code/Vim.
+
+---
+
 ## What's Next
 
-### Phase 9: File Interactions (2-3 days) - RECOMMENDED NEXT
-- Open file in editor (`Cmd+Shift+O`) — requires Tauri shell command
-- Copy file path (`Cmd+Shift+C`) — requires Tauri clipboard command
-- Context menu on file tree items
-
-### Phase 10: Change Detection (3-4 days)
+### Phase 10: Change Detection (3-4 days) - RECOMMENDED NEXT
 - File watcher for live updates (`notify` + `tokio` crates — reserved, not yet added)
 - Refresh flow with state preservation
 
@@ -276,7 +303,7 @@ See `docs/implementation-plan.md` for full task breakdown.
 3. **Comparison mode persistence** - Last-used mode not yet persisted per repository
 4. **`G` key (Shift+g)** - The `case 'g'` in useKeyboardManager checks `e.shiftKey` but `e.key` is `'G'` when shifted, so `G` for last file may not work — needs a `case 'G':` added
 5. **Command palette** - Deferred from Phase 7, not yet implemented
-6. **Phase 8 not yet build-tested** - All code is written but a `pnpm dev` / `cargo build` has not been run to verify compilation
+6. **Phases 8-9 not yet build-tested** - All code is written but `pnpm dev` / `cargo build` has not been run to verify compilation
 
 ---
 

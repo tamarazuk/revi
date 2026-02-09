@@ -5,6 +5,7 @@ import { FileTreeItem } from './FileTreeItem';
 interface DirectoryGroupProps {
   dirPath: string;
   files: FileEntry[];
+  repoRoot: string;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
   focusedFile: string | null;
@@ -13,6 +14,7 @@ interface DirectoryGroupProps {
 export function DirectoryGroup({
   dirPath,
   files,
+  repoRoot,
   selectedFile,
   onSelectFile,
   focusedFile,
@@ -35,6 +37,7 @@ export function DirectoryGroup({
           <FileTreeItem
             key={file.path}
             file={file}
+            repoRoot={repoRoot}
             isSelected={selectedFile === file.path}
             isFocused={focusedFile === file.path}
             onSelect={() => onSelectFile(file.path)}
@@ -67,6 +70,7 @@ export function DirectoryGroup({
             <FileTreeItem
               key={file.path}
               file={file}
+              repoRoot={repoRoot}
               isSelected={selectedFile === file.path}
               isFocused={focusedFile === file.path}
               onSelect={() => onSelectFile(file.path)}

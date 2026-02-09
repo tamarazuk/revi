@@ -38,6 +38,9 @@ tree-sitter-md = "0.5"
 tree-sitter-yaml = "0.7"
 tree-sitter-bash = "0.23"
 
+# Clipboard plugin
+tauri-plugin-clipboard-manager = "2"
+
 # LRU cache for diff caching
 lru = "0.12"
 

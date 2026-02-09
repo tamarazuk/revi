@@ -34,6 +34,17 @@ const SHORTCUT_GROUPS = [
     title: 'Window',
     shortcuts: [
       { keys: ['Cmd+N'], label: 'New window' },
+      { keys: ['\u2318+'], label: 'Zoom in' },
+      { keys: ['\u2318-'], label: 'Zoom out' },
+      { keys: ['\u23180'], label: 'Reset zoom' },
+    ],
+  },
+  {
+    title: 'File',
+    shortcuts: [
+      { keys: ['\u2318\u21e7O'], label: 'Open in editor' },
+      { keys: ['\u2318C'], label: 'Copy relative path' },
+      { keys: ['\u2318\u21e7C'], label: 'Copy absolute path' },
     ],
   },
 ];

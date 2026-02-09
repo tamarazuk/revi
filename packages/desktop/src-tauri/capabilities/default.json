@@ -12,6 +12,9 @@
     "fs:allow-create",
     "fs:allow-mkdir",
     "shell:allow-open",
+    "shell:allow-spawn",
+    "clipboard-manager:allow-write-text",
+    "core:webview:allow-set-webview-zoom",
     "dialog:default",
     "dialog:allow-open"
   ]

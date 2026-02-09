@@ -3,7 +3,7 @@
 
 mod commands;
 
-use commands::{git, highlight, session, window};
+use commands::{file_ops, git, highlight, session, window};
 use tauri::Manager;
 
 fn main() {
@@ -11,6 +11,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(window::WindowManager::new())
         .invoke_handler(tauri::generate_handler![
             session::get_session_arg,
@@ -34,6 +35,8 @@ fn main() {
             window::save_window_states,
             window::load_window_states,
             window::get_window_session,
+            file_ops::open_in_editor,
+            file_ops::copy_to_clipboard,
         ])
         .setup(|app| {
             window::restore_windows(app.handle());

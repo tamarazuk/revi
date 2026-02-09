@@ -1,11 +1,18 @@
 import { useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useSessionStore } from '../stores/session';
 import { useUIStore } from '../stores/ui';
 import { useKeyboardStore } from '../stores/keyboard';
 import { useSidebarStore } from '../stores/sidebar';
 import { useReviewStateStore } from '../stores/reviewState';
 import type { FileEntry } from '@revi/shared';
+
+// Track zoom level (persisted in memory, could be stored in localStorage)
+let currentZoom = 1.0;
+const ZOOM_STEP = 0.1;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2.0;
 
 /**
  * Central keyboard manager. Attaches a single global keydown listener
@@ -102,6 +109,68 @@ export function useKeyboardManager() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault();
         invoke('create_window');
+        return;
+      }
+
+      // Cmd/Ctrl+Shift+O: open file in editor
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        if (selectedFile && session) {
+          const fullPath = `${session.repoRoot}/${selectedFile}`;
+          invoke('open_in_editor', { filePath: fullPath, line: null }).catch((err) => {
+            console.error('Failed to open in editor:', err);
+          });
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+Shift+C: copy absolute file path
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        if (selectedFile && session) {
+          const fullPath = `${session.repoRoot}/${selectedFile}`;
+          invoke('copy_to_clipboard', { content: fullPath }).catch((err) => {
+            console.error('Failed to copy to clipboard:', err);
+          });
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+C: copy relative file path
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        if (selectedFile) {
+          invoke('copy_to_clipboard', { content: selectedFile }).catch((err) => {
+            console.error('Failed to copy to clipboard:', err);
+          });
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+Plus: zoom in
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        const webview = getCurrentWebviewWindow();
+        currentZoom = Math.min(currentZoom + ZOOM_STEP, ZOOM_MAX);
+        webview.setZoom(currentZoom);
+        return;
+      }
+
+      // Cmd/Ctrl+Minus: zoom out
+      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault();
+        const webview = getCurrentWebviewWindow();
+        currentZoom = Math.max(currentZoom - ZOOM_STEP, ZOOM_MIN);
+        webview.setZoom(currentZoom);
+        return;
+      }
+
+      // Cmd/Ctrl+0: reset zoom
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        const webview = getCurrentWebviewWindow();
+        currentZoom = 1.0;
+        webview.setZoom(currentZoom);
         return;
       }
 
