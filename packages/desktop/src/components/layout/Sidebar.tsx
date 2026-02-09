@@ -1,6 +1,7 @@
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { FileTreeItem } from '../sidebar/FileTreeItem';
+import { ResizeHandle } from './ResizeHandle';
 import type { FileEntry } from '@revi/shared';
 
 export function Sidebar() {
@@ -34,6 +35,8 @@ export function Sidebar() {
           </div>
         ))}
       </div>
+
+      <ResizeHandle />
     </aside>
   );
 }

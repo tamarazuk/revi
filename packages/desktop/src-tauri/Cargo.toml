@@ -9,14 +9,42 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api"] }
+tauri = { version = "2", features = [] }
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+nanoid = "0.4"
+chrono = "0.4"
+
+# Tree-sitter for syntax highlighting
+tree-sitter = "0.24"
+tree-sitter-highlight = "0.24"
+
+# Language grammars (MVP set)
+# Note: Using compatible versions with tree-sitter 0.24
+tree-sitter-typescript = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-json = "0.24"
+tree-sitter-css = "0.23"
+tree-sitter-html = "0.23"
+tree-sitter-md = "0.5"
+# tree-sitter-toml disabled: version 0.20 incompatible with tree-sitter 0.24
+tree-sitter-yaml = "0.7"
+tree-sitter-bash = "0.23"
+
+# LRU cache for diff caching
+lru = "0.12"
+
+# Sync primitives for cache
+once_cell = "1"
 
 [features]
 default = ["custom-protocol"]

@@ -27,21 +27,9 @@
     }
   },
   "plugins": {
-    "fs": {
-      "scope": {
-        "allow": ["**/*"],
-        "deny": []
-      }
-    },
+    "fs": {},
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "git",
-          "cmd": "git",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }

@@ -21,11 +21,10 @@ export async function launchApp(sessionPath: string): Promise<void> {
     `/usr/local/bin/revi`,
   ];
 
-  // For MVP, we'll just print the session path
-  // The desktop app integration will be added when we build that package
-  console.log(`Session manifest written to: ${sessionPath}`);
-  console.log('\nTo open in Revi Desktop:');
-  console.log(`  pnpm desktop dev -- --session ${sessionPath}`);
+  // For MVP, we'll print the session path and instructions
+  console.log(`\nSession manifest written to: ${sessionPath}`);
+  console.log('\nTo open in Revi Desktop (development):');
+  console.log(`  cd packages/desktop && pnpm tauri dev -- -- "${sessionPath}"`);
   
   // TODO: Implement actual app launching
   // - Check for running instance via IPC

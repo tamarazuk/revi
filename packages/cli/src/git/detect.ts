@@ -10,8 +10,18 @@ export interface RepoContext {
   };
 }
 
+/**
+ * Resolve a path, accounting for pnpm's INIT_CWD when running from a workspace package
+ */
+function resolvePathFromCwd(inputPath: string): string {
+  // When running via pnpm in a monorepo, process.cwd() is the package directory,
+  // but INIT_CWD contains the directory where the user actually ran the command
+  const baseCwd = process.env.INIT_CWD || process.cwd();
+  return path.resolve(baseCwd, inputPath);
+}
+
 export async function detectRepo(inputPath: string): Promise<RepoContext> {
-  const absolutePath = path.resolve(inputPath);
+  const absolutePath = resolvePathFromCwd(inputPath);
   const git = simpleGit(absolutePath);
 
   // Check if this is a git repository

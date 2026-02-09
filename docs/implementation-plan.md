@@ -11,6 +11,7 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 0 | Project Scaffolding | 2-3 days | Monorepo with CLI, Desktop, and shared packages |
 | 1 | CLI Foundation | 3-4 days | Working `revi .` that generates manifest |
 | 2 | Desktop Shell | 3-4 days | Tauri app loads session, renders basic layout |
+| 2b | Project Picker | 1-2 days | Standalone app launch with folder picker |
 | 3 | Rust Backend Core | 5-7 days | Git ops, Tree-sitter highlighting, content hashing |
 | 4 | File Tree Sidebar | 3-4 days | Navigable file list with status indicators |
 | 5 | Diff Rendering | 7-10 days | Virtualized split/unified diff with syntax highlighting |
@@ -252,6 +253,70 @@ interface IPCMessage {
 
 ### Deliverable
 App opens, loads manifest, displays file list in sidebar, shows session info in top bar.
+
+### Phase 2b: Project Picker (Standalone Launch)
+
+When the desktop app is opened directly (without a session path from CLI), show a welcome screen with the ability to pick a repository folder.
+
+#### Components
+
+```
+components/
+├── welcome/
+│   └── WelcomeScreen.tsx    # Empty state with folder picker
+└── ui/
+    └── RecentProjects.tsx   # Optional: list of recent repos
+```
+
+#### Tauri Commands
+
+```rust
+#[tauri::command]
+async fn create_session_from_repo(
+    repo_path: String,
+    base_ref: Option<String>,
+) -> Result<ReviewManifest, String>;
+
+#[tauri::command]
+fn pick_folder() -> Result<Option<String>, String>;
+```
+
+#### Tasks
+
+- [ ] Add "Open Repository" button in empty state
+- [ ] Implement folder picker using Tauri dialog API
+- [ ] Validate selected folder is a git repository
+- [ ] Create session manifest from selected repo (reuse CLI logic in Rust)
+- [ ] Auto-detect base ref (merge-base with main/master)
+- [ ] Load the created session
+- [ ] (Optional) Store recent repositories for quick access
+- [ ] (Optional) Show recent projects list on welcome screen
+
+#### UX Flow
+
+```
+┌─────────────────────────────────────────────┐
+│                                             │
+│                   Revi                      │
+│                                             │
+│         No review session loaded.           │
+│                                             │
+│     ┌─────────────────────────────────┐     │
+│     │      Open Repository...         │     │
+│     └─────────────────────────────────┘     │
+│                                             │
+│   Or run `revi .` from your terminal        │
+│                                             │
+│   ─────────────────────────────────────     │
+│   Recent:                                   │
+│     ~/code/my-project                       │
+│     ~/code/other-repo                       │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+#### Deliverable
+App can be launched directly and user can pick a folder to review.
 
 ---
 

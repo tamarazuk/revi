@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.tauri.app/capabilities/1",
+  "identifier": "default",
+  "description": "Default capabilities for Revi",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-exists",
+    "fs:allow-create",
+    "fs:allow-mkdir",
+    "shell:allow-open",
+    "dialog:default",
+    "dialog:allow-open"
+  ]
+}
