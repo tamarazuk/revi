@@ -88,9 +88,24 @@ cd packages/desktop && pnpm tauri dev
 # Build CLI only
 pnpm --filter @revi/cli build
 
-# Run Rust tests
-cd packages/desktop/src-tauri && cargo test
+# Lint and typecheck
+pnpm lint
+pnpm typecheck
 ```
+
+### Testing
+
+```bash
+# Run Rust unit tests (from repo root)
+cd packages/desktop/src-tauri && cargo test
+
+# Run Rust tests with output
+cd packages/desktop/src-tauri && cargo test -- --nocapture
+```
+
+Current test coverage:
+- **Window dimension sanitization** — validates bounds checking for persisted window state
+- **Language detection** — verifies Tree-sitter language detection from file paths
 
 ### Architecture
 
