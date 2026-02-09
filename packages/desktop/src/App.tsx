@@ -2,12 +2,14 @@ import { TopBar } from './components/layout/TopBar';
 import { Sidebar } from './components/layout/Sidebar';
 import { DiffPane } from './components/layout/DiffPane';
 import { useSessionStore } from './stores/session';
+import { useReviewStateStore } from './stores/reviewState';
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 
 export function App() {
   const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, clearSession, clearError } = useSessionStore();
+  const { loadState: loadReviewState, reset: resetReviewState } = useReviewStateStore();
   const [isPickingFolder, setIsPickingFolder] = useState(false);
   const [initComplete, setInitComplete] = useState(false);
 
@@ -38,6 +40,20 @@ export function App() {
     
     initSession();
   }, [loadSession, loadLastSession]);
+
+  // Load review state when session changes
+  useEffect(() => {
+    if (session) {
+      loadReviewState(
+        session.repoRoot,
+        session.sessionId,
+        session.base.sha,
+        session.head.sha
+      );
+    } else {
+      resetReviewState();
+    }
+  }, [session, loadReviewState, resetReviewState]);
 
   const handleOpenRepository = async () => {
     setIsPickingFolder(true);

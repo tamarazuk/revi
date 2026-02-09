@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import type { FileEntry } from '@revi/shared';
+import { useReviewStateStore } from '../../stores/reviewState';
 
 interface FileTreeItemProps {
   file: FileEntry;
@@ -10,12 +11,14 @@ interface FileTreeItemProps {
 
 export function FileTreeItem({ file, isSelected, isFocused, onSelect }: FileTreeItemProps) {
   const fileName = file.path.split('/').pop() || file.path;
+  const isViewed = useReviewStateStore((state) => state.isViewed(file.path));
 
   return (
     <button
       className={clsx('file-tree-item', {
         'file-tree-item--selected': isSelected,
         'file-tree-item--focused': isFocused,
+        'file-tree-item--viewed': isViewed,
         'file-tree-item--added': file.status === 'added',
         'file-tree-item--modified': file.status === 'modified',
         'file-tree-item--deleted': file.status === 'deleted',
@@ -23,6 +26,9 @@ export function FileTreeItem({ file, isSelected, isFocused, onSelect }: FileTree
       })}
       onClick={onSelect}
     >
+      <span className="file-tree-item__viewed-indicator">
+        {isViewed ? '✓' : '○'}
+      </span>
       <span className="file-tree-item__status">
         {getStatusIndicator(file.status)}
       </span>

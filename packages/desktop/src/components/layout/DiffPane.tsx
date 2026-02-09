@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
+import { useReviewStateStore } from '../../stores/reviewState';
 import { useDiff } from '../../hooks/useDiff';
 import { UnifiedView } from '../diff/UnifiedView';
 import { SplitView } from '../diff/SplitView';
@@ -7,7 +9,21 @@ import { SplitView } from '../diff/SplitView';
 export function DiffPane() {
   const { selectedFile, session } = useSessionStore();
   const { diffMode } = useUIStore();
+  const { markViewed } = useReviewStateStore();
   const { diff, isLoading, error } = useDiff({ filePath: selectedFile });
+
+  // Mark file as viewed when diff successfully loads
+  useEffect(() => {
+    if (diff && selectedFile && !isLoading && !error) {
+      const file = session?.files.find((f) => f.path === selectedFile);
+      if (file) {
+        markViewed(selectedFile, diff.contentHash, {
+          additions: file.additions,
+          deletions: file.deletions,
+        });
+      }
+    }
+  }, [diff, selectedFile, isLoading, error, session, markViewed]);
 
   if (!session) return null;
 

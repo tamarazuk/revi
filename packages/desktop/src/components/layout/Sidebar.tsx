@@ -2,6 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useSidebarStore, expandAllDirs } from '../../stores/sidebar';
+import { useReviewStateStore } from '../../stores/reviewState';
 import { useFileNavigation } from '../../hooks/useFileNavigation';
 import { FileFilter } from '../sidebar/FileFilter';
 import { DirectoryGroup } from '../sidebar/DirectoryGroup';
@@ -12,6 +13,7 @@ export function Sidebar() {
   const { session, selectedFile, selectFile } = useSessionStore();
   const { sidebarVisible, sidebarWidth } = useUIStore();
   const { filter, expandedDirs } = useSidebarStore();
+  const { isViewed } = useReviewStateStore();
 
   // Filter files based on current filter state
   const filteredFiles = useMemo(() => {
@@ -31,11 +33,20 @@ export function Sidebar() {
         }
       }
 
-      // Viewed filter would go here when we have viewed state
+      // Viewed filter
+      if (filter.viewedState !== 'all') {
+        const fileIsViewed = isViewed(file.path);
+        if (filter.viewedState === 'viewed' && !fileIsViewed) {
+          return false;
+        }
+        if (filter.viewedState === 'unviewed' && fileIsViewed) {
+          return false;
+        }
+      }
 
       return true;
     });
-  }, [session, filter]);
+  }, [session, filter, isViewed]);
 
   // Group files by directory
   const groupedFiles = useMemo(() => {
@@ -105,7 +116,7 @@ export function Sidebar() {
 
       <div className="sidebar__footer">
         <span className="sidebar__hint">
-          <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> open
+          <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>v</kbd> mark viewed
         </span>
       </div>
 

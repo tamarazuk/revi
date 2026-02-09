@@ -16,6 +16,7 @@ This document outlines the phased implementation approach for Revi MVP. Each pha
 | 4 | File Tree Sidebar | 3-4 days | Navigable file list with status indicators |
 | 5 | Diff Rendering | 7-10 days | Virtualized split/unified diff with syntax highlighting |
 | 6 | State Management | 4-5 days | Persistence, fuzzy recovery, viewed state |
+| 6b | Comparison Mode Switcher | 2-3 days | Switch between uncommitted/branch/custom comparison modes |
 | 7 | Keyboard Navigation | 2-3 days | Full keybinding system |
 | 8 | File Interactions | 2-3 days | Open in editor, copy, collapse controls |
 | 9 | Change Detection | 3-4 days | File watcher, refresh flow |
@@ -722,6 +723,96 @@ pub fn recover_state(
 
 ### Deliverable
 State persists across app restarts; fuzzy recovery works after rebase/amend.
+
+---
+
+## Phase 6b: Comparison Mode Switcher
+
+### Goal
+Allow users to switch between different comparison modes directly in the UI, rather than being locked to the auto-detected mode.
+
+### Comparison Modes
+
+1. **Uncommitted Changes** - HEAD vs Working Tree (staged + unstaged + untracked)
+2. **Branch Changes** - merge-base(main)..HEAD (all commits on current branch)
+3. **Custom** - User-specified base and head refs
+
+### UI Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [Uncommitted Changes ▼]   main..feature-branch (abc1234)       │
+│  ├─ Uncommitted Changes                                         │
+│  ├─ Branch Changes (vs main)                                    │
+│  └─ Custom Comparison...                                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Model
+
+```typescript
+type ComparisonMode = 
+  | { type: 'uncommitted' }
+  | { type: 'branch'; baseBranch: string }  // e.g., 'main', 'master'
+  | { type: 'custom'; baseRef: string; headRef: string };
+
+interface ReviewManifest {
+  // ... existing fields
+  comparisonMode: ComparisonMode;
+}
+```
+
+### Components
+
+```
+components/
+├── topbar/
+│   ├── ComparisonModeDropdown.tsx   # Main dropdown selector
+│   └── CustomComparisonModal.tsx    # Ref picker for custom mode
+```
+
+### Tauri Commands
+
+```rust
+#[tauri::command]
+async fn create_session_with_mode(
+    repo_path: String,
+    mode: ComparisonMode,
+) -> Result<ReviewManifest, String>;
+
+#[tauri::command]
+fn list_branches(repo_root: String) -> Result<Vec<String>, String>;
+
+#[tauri::command]
+fn list_recent_commits(
+    repo_root: String, 
+    count: u32
+) -> Result<Vec<CommitInfo>, String>;
+```
+
+### Tasks
+
+- [ ] Add `ComparisonMode` type to shared package
+- [ ] Extend `ReviewManifest` to include `comparisonMode` field
+- [ ] Modify `create_session_from_repo` to accept mode parameter
+- [ ] Implement `list_branches` Tauri command
+- [ ] Implement `list_recent_commits` Tauri command (for custom ref picker)
+- [ ] Create `ComparisonModeDropdown` component
+- [ ] Create `CustomComparisonModal` with branch/commit picker
+- [ ] Update TopBar to show current mode with dropdown
+- [ ] Persist last-used mode per repository
+- [ ] Handle mode switching (reload session with new mode)
+- [ ] Show clear indication when viewing uncommitted vs branch changes
+
+### UX Details
+
+- **Auto-detection behavior**: Keep current logic as default, but show which mode was auto-selected
+- **Mode persistence**: Remember last-used mode per repository
+- **Uncommitted badge**: When in branch mode but uncommitted changes exist, show subtle indicator
+- **Empty states**: Clear messaging when mode has no changes (e.g., "No uncommitted changes")
+
+### Deliverable
+User can switch between uncommitted changes view and branch diff view via TopBar dropdown, with option for custom ref comparison.
 
 ---
 

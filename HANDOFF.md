@@ -29,6 +29,7 @@
 | **Phase 4** | Done | File tree sidebar (filters, directory groups, keyboard nav) |
 | **Phase 5** | Done | Diff rendering (unified/split views, syntax highlighting) |
 | **Session Persistence** | Done | Auto-restore last project on app relaunch |
+| **Phase 6** | Done | State management (viewed files, persistence, progress tracking) |
 
 ### Recent Git History
 
@@ -166,10 +167,13 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ## What's Next
 
-### Phase 6: State Management (4-5 days)
-- Persist viewed files, scroll positions
-- Fuzzy recovery after rebase/amend (content hash matching)
-- "Changed since last view" badges
+### Phase 6b: Comparison Mode Switcher (2-3 days) - RECOMMENDED NEXT
+- Dropdown in TopBar to switch between comparison modes:
+  - **Uncommitted Changes** (HEAD vs Working Tree)
+  - **Branch Changes** (main..HEAD)
+  - **Custom** (pick refs)
+- List branches and recent commits for custom selection
+- Persist last-used mode per repository
 
 ### Phase 7: Keyboard Navigation (2-3 days)
 - Full keybinding system (n/p for next/prev file, etc.)
@@ -239,13 +243,16 @@ From `.claude/CLAUDE.md`:
 
 ## Recommended Next Step
 
-Start **Phase 6: State Management** to persist viewed files and add recovery features:
+Start **Phase 6b: Comparison Mode Switcher** to let users switch between:
+- Uncommitted changes (HEAD vs working tree)
+- Branch changes (main..HEAD) 
+- Custom comparison (pick base/head refs)
 
-1. Extend `PersistedState` in the frontend store
-2. Call `save_review_state` / `load_review_state` Tauri commands
-3. Add "viewed" checkmarks to file list
-4. Implement content hash comparison for fuzzy recovery
+Key implementation steps:
+1. Add `ComparisonMode` type to shared package
+2. Add `list_branches` and `list_recent_commits` Tauri commands
+3. Create `ComparisonModeDropdown` component in TopBar
+4. Modify session creation to accept mode parameter
+5. Handle mode switching and persistence
 
-Alternatively, **Phase 7: Keyboard Navigation** is a good smaller scope if you want quicker wins.
-
-To continue, read the implementation plan and the current component code, then implement the next phase incrementally.
+To continue, read the implementation plan (`docs/implementation-plan.md` Phase 6b section) and start with the shared types.

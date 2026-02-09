@@ -8,8 +8,16 @@ const STATUS_OPTIONS: { value: FileStatus; label: string; color: string }[] = [
   { value: 'renamed', label: 'R', color: 'var(--accent-purple)' },
 ];
 
+type ViewedFilter = 'all' | 'viewed' | 'unviewed';
+
+const VIEWED_OPTIONS: { value: ViewedFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'unviewed', label: 'Unviewed' },
+  { value: 'viewed', label: 'Viewed' },
+];
+
 export function FileFilter() {
-  const { filter, setSearchQuery, toggleStatusFilter, clearFilters } =
+  const { filter, setSearchQuery, toggleStatusFilter, setViewedFilter, clearFilters } =
     useSidebarStore();
 
   const hasActiveFilters =
@@ -37,26 +45,44 @@ export function FileFilter() {
           </button>
         )}
       </div>
-      <div className="file-filter__status">
-        {STATUS_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            className={`file-filter__status-btn ${
-              filter.status.includes(opt.value)
-                ? 'file-filter__status-btn--active'
-                : ''
-            }`}
-            style={
-              filter.status.includes(opt.value)
-                ? { backgroundColor: opt.color, borderColor: opt.color }
-                : undefined
-            }
-            onClick={() => toggleStatusFilter(opt.value)}
-            title={`Filter by ${opt.value}`}
-          >
-            {opt.label}
-          </button>
-        ))}
+      <div className="file-filter__row">
+        <div className="file-filter__status">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className={`file-filter__status-btn ${
+                filter.status.includes(opt.value)
+                  ? 'file-filter__status-btn--active'
+                  : ''
+              }`}
+              style={
+                filter.status.includes(opt.value)
+                  ? { backgroundColor: opt.color, borderColor: opt.color }
+                  : undefined
+              }
+              onClick={() => toggleStatusFilter(opt.value)}
+              title={`Filter by ${opt.value}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="file-filter__viewed">
+          {VIEWED_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className={`file-filter__viewed-btn ${
+                filter.viewedState === opt.value
+                  ? 'file-filter__viewed-btn--active'
+                  : ''
+              }`}
+              onClick={() => setViewedFilter(opt.value)}
+              title={`Show ${opt.label.toLowerCase()} files`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

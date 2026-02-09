@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import type { FileEntry } from '@revi/shared';
 import { useSidebarStore } from '../stores/sidebar';
+import { useReviewStateStore } from '../stores/reviewState';
 
 interface UseFileNavigationOptions {
   files: FileEntry[];
@@ -23,6 +24,7 @@ export function useFileNavigation({
   // Focused file is what keyboard nav highlights; selected file is what's opened in diff pane
   const [focusedFile, setFocusedFile] = useState<string | null>(selectedFile);
   const { expandedDirs, expandDir } = useSidebarStore();
+  const { toggleViewed, files: reviewFiles } = useReviewStateStore();
 
   // Get visible files (respecting collapsed directories)
   const getVisibleFiles = useCallback(() => {
@@ -142,9 +144,25 @@ export function useFileNavigation({
           }
           break;
         }
+        case 'v': {
+          // Toggle viewed status for focused file
+          e.preventDefault();
+          if (focusedFile) {
+            const file = files.find((f) => f.path === focusedFile);
+            const existingState = reviewFiles[focusedFile];
+            if (file) {
+              toggleViewed(
+                focusedFile,
+                existingState?.contentHash || '',
+                existingState?.diffStats || { additions: file.additions, deletions: file.deletions }
+              );
+            }
+          }
+          break;
+        }
       }
     },
-    [enabled, focusedFile, getVisibleFiles, onSelectFile, expandDir]
+    [enabled, focusedFile, files, getVisibleFiles, onSelectFile, expandDir, toggleViewed, reviewFiles]
   );
 
   // Attach global keyboard listener

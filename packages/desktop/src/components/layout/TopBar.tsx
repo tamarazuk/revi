@@ -1,5 +1,6 @@
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
+import { useReviewStateStore } from '../../stores/reviewState';
 
 interface TopBarProps {
   onChangeProject?: () => void;
@@ -8,10 +9,10 @@ interface TopBarProps {
 export function TopBar({ onChangeProject }: TopBarProps) {
   const { session } = useSessionStore();
   const { diffMode, toggleDiffMode } = useUIStore();
+  const viewedCount = useReviewStateStore((state) => state.getViewedCount());
 
   if (!session) return null;
 
-  const viewedCount = 0; // TODO: Calculate from review state
   const totalCount = session.files.length;
 
   return (

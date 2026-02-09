@@ -449,6 +449,41 @@ body {
   color: #fff;
 }
 
+/* File Filter Row (status + viewed filters) */
+.file-filter__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Viewed Filter */
+.file-filter__viewed {
+  display: flex;
+  gap: 0.125rem;
+}
+
+.file-filter__viewed-btn {
+  padding: 0.125rem 0.375rem;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.6875rem;
+  transition: all 0.15s ease;
+}
+
+.file-filter__viewed-btn:hover {
+  color: var(--text-primary);
+}
+
+.file-filter__viewed-btn--active {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
 /* Directory Group */
 .directory-group {
   margin-bottom: 0.25rem;
@@ -510,6 +545,23 @@ body {
 .file-tree-item--focused {
   outline: 1px solid var(--accent-blue);
   outline-offset: -1px;
+}
+
+/* File Tree Item - Viewed state */
+.file-tree-item__viewed-indicator {
+  flex-shrink: 0;
+  width: 1rem;
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.file-tree-item--viewed .file-tree-item__viewed-indicator {
+  color: var(--accent-green);
+}
+
+.file-tree-item--viewed .file-tree-item__name {
+  color: var(--text-muted);
 }
 
 /* Sidebar Footer */
