@@ -5,6 +5,25 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+// Reasonable bounds for window dimensions to prevent corrupted state
+const MIN_WIDTH: f64 = 800.0;
+const MAX_WIDTH: f64 = 8000.0;
+const MIN_HEIGHT: f64 = 600.0;
+const MAX_HEIGHT: f64 = 5000.0;
+const DEFAULT_WIDTH: f64 = 1400.0;
+const DEFAULT_HEIGHT: f64 = 900.0;
+
+/// Clamp dimensions to reasonable bounds, returning defaults if invalid
+fn sanitize_dimensions(width: Option<f64>, height: Option<f64>) -> (f64, f64) {
+    let w = width
+        .filter(|&v| v >= MIN_WIDTH && v <= MAX_WIDTH)
+        .unwrap_or(DEFAULT_WIDTH);
+    let h = height
+        .filter(|&v| v >= MIN_HEIGHT && v <= MAX_HEIGHT)
+        .unwrap_or(DEFAULT_HEIGHT);
+    (w, h)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub label: String,
@@ -49,8 +68,8 @@ pub fn create_window(app: AppHandle) -> Result<String, String> {
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
         .title("Revi")
-        .inner_size(1400.0, 900.0)
-        .min_inner_size(800.0, 600.0)
+        .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .resizable(true)
         .build()
         .map_err(|e| format!("Failed to create window: {}", e))?;
@@ -65,8 +84,8 @@ pub fn create_window(app: AppHandle) -> Result<String, String> {
             base_ref: None,
             x: None,
             y: None,
-            width: Some(1400.0),
-            height: Some(900.0),
+            width: Some(DEFAULT_WIDTH),
+            height: Some(DEFAULT_HEIGHT),
         },
     );
 
@@ -83,15 +102,17 @@ pub fn register_window_session(
     let manager = app.state::<WindowManager>();
     let mut windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
 
-    let entry = windows.entry(window_label.clone()).or_insert_with(|| WindowInfo {
-        label: window_label,
-        repo_path: None,
-        base_ref: None,
-        x: None,
-        y: None,
-        width: None,
-        height: None,
-    });
+    let entry = windows
+        .entry(window_label.clone())
+        .or_insert_with(|| WindowInfo {
+            label: window_label,
+            repo_path: None,
+            base_ref: None,
+            x: None,
+            y: None,
+            width: None,
+            height: None,
+        });
 
     entry.repo_path = repo_path;
     entry.base_ref = base_ref;
@@ -127,7 +148,10 @@ pub fn load_window_states(app: AppHandle) -> Result<Option<PersistedWindowStates
 }
 
 #[tauri::command]
-pub fn get_window_session(app: AppHandle, window_label: String) -> Result<Option<WindowInfo>, String> {
+pub fn get_window_session(
+    app: AppHandle,
+    window_label: String,
+) -> Result<Option<WindowInfo>, String> {
     let manager = app.state::<WindowManager>();
     let windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
     Ok(windows.get(&window_label).cloned())
@@ -211,35 +235,29 @@ pub fn restore_windows(app: &AppHandle) {
     manager.set_counter_min(max_counter + 1);
 
     for info in &states.windows {
+        // Sanitize dimensions to prevent corrupted state from breaking rendering
+        let (w, h) = sanitize_dimensions(info.width, info.height);
+
         if info.label == "main" {
             // Main window is already created by tauri.conf.json — just register session info
             // and restore position/size
             if let Some(win) = app.get_webview_window("main") {
                 if let (Some(x), Some(y)) = (info.x, info.y) {
-                    let _ = win.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(
-                        x, y,
-                    )));
+                    let _ = win
+                        .set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
                 }
-                if let (Some(w), Some(h)) = (info.width, info.height) {
-                    let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(w, h)));
-                }
+                let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(w, h)));
             }
 
             let mut windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
             windows.insert("main".to_string(), info.clone());
         } else {
             // Create additional windows
-            let mut builder =
-                WebviewWindowBuilder::new(app, &info.label, WebviewUrl::default())
-                    .title("Revi")
-                    .min_inner_size(800.0, 600.0)
-                    .resizable(true);
-
-            if let (Some(w), Some(h)) = (info.width, info.height) {
-                builder = builder.inner_size(w, h);
-            } else {
-                builder = builder.inner_size(1400.0, 900.0);
-            }
+            let mut builder = WebviewWindowBuilder::new(app, &info.label, WebviewUrl::default())
+                .title("Revi")
+                .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
+                .inner_size(w, h)
+                .resizable(true);
 
             if let (Some(x), Some(y)) = (info.x, info.y) {
                 builder = builder.position(x, y);
