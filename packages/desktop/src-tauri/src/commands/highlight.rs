@@ -306,6 +306,68 @@ pub fn highlight_line(line: &str, language: &str) -> Vec<HighlightSpan> {
     highlight_code_internal(line, language).unwrap_or_default()
 }
 
+/// Pre-compute highlights for an entire file and return a line-indexed lookup
+/// Each entry is a Vec of spans with positions relative to that line's start
+pub fn highlight_file_lines(content: &str, language: &str) -> Vec<Vec<HighlightSpan>> {
+    // Get all spans for the full file
+    let all_spans = highlight_code_internal(content, language).unwrap_or_default();
+
+    if all_spans.is_empty() {
+        return Vec::new();
+    }
+
+    // Build line offset table: line_offsets[i] = byte offset where line i starts
+    let mut line_offsets: Vec<u32> = vec![0];
+    for (i, ch) in content.char_indices() {
+        if ch == '\n' {
+            line_offsets.push((i + 1) as u32);
+        }
+    }
+
+    let num_lines = line_offsets.len();
+    let mut result: Vec<Vec<HighlightSpan>> = vec![Vec::new(); num_lines];
+
+    // Distribute spans to their respective lines
+    for span in all_spans {
+        // Find which line this span starts on using binary search
+        let line_idx = match line_offsets.binary_search(&span.start) {
+            Ok(idx) => idx,                    // Exact match - span starts at beginning of line
+            Err(idx) => idx.saturating_sub(1), // Span starts somewhere in the previous line
+        };
+
+        if line_idx >= num_lines {
+            continue;
+        }
+
+        let line_start = line_offsets[line_idx];
+
+        // Calculate the end of this line (either next line's start - 1, or end of content)
+        let line_end = if line_idx + 1 < line_offsets.len() {
+            line_offsets[line_idx + 1]
+        } else {
+            content.len() as u32
+        };
+
+        // Clamp span to this line and convert to line-relative offsets
+        let span_start_in_line = span.start.saturating_sub(line_start);
+        let span_end_in_line = span.end.min(line_end).saturating_sub(line_start);
+
+        // Only add if the span has content on this line
+        if span_start_in_line < span_end_in_line {
+            result[line_idx].push(HighlightSpan {
+                start: span_start_in_line,
+                end: span_end_in_line,
+                scope: span.scope.clone(),
+            });
+        }
+
+        // If span crosses to next line(s), we'd need to split it
+        // For now, most tokens don't span multiple lines, so this is fine
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

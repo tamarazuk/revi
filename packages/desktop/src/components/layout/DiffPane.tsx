@@ -1,7 +1,13 @@
 import { useSessionStore } from '../../stores/session';
+import { useUIStore } from '../../stores/ui';
+import { useDiff } from '../../hooks/useDiff';
+import { UnifiedView } from '../diff/UnifiedView';
+import { SplitView } from '../diff/SplitView';
 
 export function DiffPane() {
   const { selectedFile, session } = useSessionStore();
+  const { diffMode } = useUIStore();
+  const { diff, isLoading, error } = useDiff({ filePath: selectedFile });
 
   if (!session) return null;
 
@@ -28,28 +34,81 @@ export function DiffPane() {
     );
   }
 
+  // Handle binary files
+  if (file.binary) {
+    return (
+      <main className="diff-pane">
+        <DiffHeader file={file} />
+        <div className="diff-pane__content diff-pane__content--centered">
+          <div className="binary-message">
+            <p>Binary file</p>
+            <p className="dim">{file.path}</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="diff-pane">
-      <div className="diff-pane__header">
-        <span className="diff-pane__path">{file.path}</span>
-        <span className="diff-pane__stats">
-          <span className="addition">+{file.additions}</span>
-          {' '}
-          <span className="deletion">-{file.deletions}</span>
-        </span>
-      </div>
-
+      <DiffHeader file={file} />
       <div className="diff-pane__content">
-        {/* TODO: Render actual diff content */}
-        <div className="diff-placeholder">
-          <p>Diff viewer will be implemented in Phase 5</p>
-          <p className="dim">
-            File: {file.path}<br />
-            Status: {file.status}<br />
-            Changes: +{file.additions} -{file.deletions}
-          </p>
-        </div>
+        {isLoading && (
+          <div className="diff-loading">
+            <span className="diff-loading__spinner" />
+            Loading diff...
+          </div>
+        )}
+        {error && (
+          <div className="diff-error">
+            <p>Failed to load diff</p>
+            <p className="dim">{error}</p>
+          </div>
+        )}
+        {diff && !isLoading && (
+          <>
+            {diff.hunks.length === 0 ? (
+              <div className="diff-empty">
+                <p>No changes in this file</p>
+              </div>
+            ) : diffMode === 'split' ? (
+              <SplitView diff={diff} />
+            ) : (
+              <UnifiedView diff={diff} />
+            )}
+          </>
+        )}
       </div>
     </main>
+  );
+}
+
+interface DiffHeaderProps {
+  file: {
+    path: string;
+    additions: number;
+    deletions: number;
+    status: string;
+    renamedFrom?: string;
+  };
+}
+
+function DiffHeader({ file }: DiffHeaderProps) {
+  return (
+    <div className="diff-pane__header">
+      <div className="diff-pane__path-info">
+        {file.renamedFrom && (
+          <span className="diff-pane__renamed">
+            {file.renamedFrom} →{' '}
+          </span>
+        )}
+        <span className="diff-pane__path">{file.path}</span>
+      </div>
+      <span className="diff-pane__stats">
+        <span className="addition">+{file.additions}</span>
+        {' '}
+        <span className="deletion">-{file.deletions}</span>
+      </span>
+    </div>
   );
 }

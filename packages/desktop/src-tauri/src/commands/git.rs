@@ -6,7 +6,9 @@ use std::num::NonZeroUsize;
 use std::process::Command;
 use std::sync::Mutex;
 
-use super::highlight::{detect_language_from_path, highlight_line, HighlightSpan};
+use super::highlight::{
+    detect_language_from_path, highlight_file_lines, highlight_line, HighlightSpan,
+};
 
 /// LRU cache for computed diffs
 /// Key: "{repo_root}:{base_sha}:{head_sha}:{file_path}:{ignore_whitespace}"
@@ -142,8 +144,6 @@ pub fn get_file_diff(
         String::from_utf8_lossy(&output.stdout).into_owned()
     };
 
-    let content_hash = compute_hash(&diff_content);
-
     // Detect language for syntax highlighting
     let language = detect_language_from_path(&file_path);
 
@@ -158,13 +158,32 @@ pub fn get_file_diff(
     // Get file content at base for deleted lines
     let base_content = get_file_at_ref(&repo_root, &base_sha, &file_path).ok();
 
-    // Parse the diff output with highlighting
-    let (hunks, stats) = parse_diff_with_highlights(
-        &diff_content,
-        &language,
-        head_content.as_deref(),
-        base_content.as_deref(),
-    );
+    // Check if this is a new file (no base content and empty diff but head content exists)
+    let (hunks, stats, content_hash) =
+        if diff_content.trim().is_empty() && base_content.is_none() && head_content.is_some() {
+            // New file: generate synthetic diff showing all lines as additions
+            let file_content = head_content.as_deref().unwrap();
+            let content_hash = compute_hash(file_content);
+            let (hunks, stats) = generate_new_file_diff(file_content, &language);
+            (hunks, stats, content_hash)
+        } else if diff_content.trim().is_empty() && head_content.is_none() && base_content.is_some()
+        {
+            // Deleted file: generate synthetic diff showing all lines as deletions
+            let file_content = base_content.as_deref().unwrap();
+            let content_hash = compute_hash(file_content);
+            let (hunks, stats) = generate_deleted_file_diff(file_content, &language);
+            (hunks, stats, content_hash)
+        } else {
+            // Normal diff: parse the git diff output
+            let content_hash = compute_hash(&diff_content);
+            let (hunks, stats) = parse_diff_with_highlights(
+                &diff_content,
+                &language,
+                head_content.as_deref(),
+                base_content.as_deref(),
+            );
+            (hunks, stats, content_hash)
+        };
 
     let diff = FileDiff {
         path: file_path,
@@ -247,12 +266,12 @@ fn parse_diff_with_highlights(
     head_content: Option<&str>,
     base_content: Option<&str>,
 ) -> (Vec<Hunk>, DiffStats) {
-    // Build line lookup tables for efficient highlighting
-    let head_lines: Vec<&str> = head_content
-        .map(|c| c.lines().collect())
+    // Pre-compute highlights for entire files (gives Tree-sitter full context)
+    let head_highlights: Vec<Vec<HighlightSpan>> = head_content
+        .map(|c| highlight_file_lines(c, language))
         .unwrap_or_default();
-    let base_lines: Vec<&str> = base_content
-        .map(|c| c.lines().collect())
+    let base_highlights: Vec<Vec<HighlightSpan>> = base_content
+        .map(|c| highlight_file_lines(c, language))
         .unwrap_or_default();
 
     let mut hunks = Vec::new();
@@ -284,40 +303,34 @@ fn parse_diff_with_highlights(
                 });
             }
         } else if let Some(ref mut hunk) = current_hunk {
-            let (line_type, content, old_num, new_num, source_line) =
+            let (line_type, content, old_num, new_num, highlights) =
                 if line.starts_with('+') && !line.starts_with("+++") {
                     total_additions += 1;
                     let ln = new_line_num;
                     new_line_num += 1;
                     let content = &line[1..];
-                    // For added lines, get the actual source line for proper highlighting
-                    let source = head_lines
+                    // Look up pre-computed highlights for this line
+                    let hl = head_highlights
                         .get(ln.saturating_sub(1) as usize)
-                        .copied()
-                        .unwrap_or(content);
-                    (
-                        "added".to_string(),
-                        content.to_string(),
-                        None,
-                        Some(ln),
-                        source.to_string(),
-                    )
+                        .cloned()
+                        .unwrap_or_else(|| highlight_line(content, language));
+                    ("added".to_string(), content.to_string(), None, Some(ln), hl)
                 } else if line.starts_with('-') && !line.starts_with("---") {
                     total_deletions += 1;
                     let ln = old_line_num;
                     old_line_num += 1;
                     let content = &line[1..];
-                    // For deleted lines, get from base content
-                    let source = base_lines
+                    // Look up pre-computed highlights from base content
+                    let hl = base_highlights
                         .get(ln.saturating_sub(1) as usize)
-                        .copied()
-                        .unwrap_or(content);
+                        .cloned()
+                        .unwrap_or_else(|| highlight_line(content, language));
                     (
                         "deleted".to_string(),
                         content.to_string(),
                         Some(ln),
                         None,
-                        source.to_string(),
+                        hl,
                     )
                 } else if line.starts_with(' ') || line.is_empty() {
                     let old_ln = old_line_num;
@@ -325,24 +338,21 @@ fn parse_diff_with_highlights(
                     old_line_num += 1;
                     new_line_num += 1;
                     let content = if line.is_empty() { "" } else { &line[1..] };
-                    // For context lines, prefer head content
-                    let source = head_lines
+                    // For context lines, prefer head highlights
+                    let hl = head_highlights
                         .get(new_ln.saturating_sub(1) as usize)
-                        .copied()
-                        .unwrap_or(content);
+                        .cloned()
+                        .unwrap_or_else(|| highlight_line(content, language));
                     (
                         "context".to_string(),
                         content.to_string(),
                         Some(old_ln),
                         Some(new_ln),
-                        source.to_string(),
+                        hl,
                     )
                 } else {
                     continue; // Skip diff metadata lines
                 };
-
-            // Apply syntax highlighting to the line
-            let highlights = highlight_line(&source_line, language);
 
             hunk.lines.push(DiffLine {
                 line_type,
@@ -391,4 +401,108 @@ fn parse_range(range: &str) -> Option<(u32, u32)> {
     } else {
         Some((range.parse().ok()?, 1))
     }
+}
+
+/// Generate a synthetic diff for a new file (all lines as additions)
+fn generate_new_file_diff(content: &str, language: &str) -> (Vec<Hunk>, DiffStats) {
+    let lines: Vec<&str> = content.lines().collect();
+    let line_count = lines.len() as u32;
+
+    if line_count == 0 {
+        return (
+            Vec::new(),
+            DiffStats {
+                additions: 0,
+                deletions: 0,
+            },
+        );
+    }
+
+    // Pre-compute highlights for entire file
+    let file_highlights = highlight_file_lines(content, language);
+
+    let mut diff_lines = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let line_num = (i + 1) as u32;
+        let highlights = file_highlights
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| highlight_line(line, language));
+        diff_lines.push(DiffLine {
+            line_type: "added".to_string(),
+            content: line.to_string(),
+            old_line_num: None,
+            new_line_num: Some(line_num),
+            highlights,
+        });
+    }
+
+    let hunk = Hunk {
+        header: format!("@@ -0,0 +1,{} @@ New file", line_count),
+        old_start: 0,
+        old_lines: 0,
+        new_start: 1,
+        new_lines: line_count,
+        lines: diff_lines,
+    };
+
+    (
+        vec![hunk],
+        DiffStats {
+            additions: line_count,
+            deletions: 0,
+        },
+    )
+}
+
+/// Generate a synthetic diff for a deleted file (all lines as deletions)
+fn generate_deleted_file_diff(content: &str, language: &str) -> (Vec<Hunk>, DiffStats) {
+    let lines: Vec<&str> = content.lines().collect();
+    let line_count = lines.len() as u32;
+
+    if line_count == 0 {
+        return (
+            Vec::new(),
+            DiffStats {
+                additions: 0,
+                deletions: 0,
+            },
+        );
+    }
+
+    // Pre-compute highlights for entire file
+    let file_highlights = highlight_file_lines(content, language);
+
+    let mut diff_lines = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let line_num = (i + 1) as u32;
+        let highlights = file_highlights
+            .get(i)
+            .cloned()
+            .unwrap_or_else(|| highlight_line(line, language));
+        diff_lines.push(DiffLine {
+            line_type: "deleted".to_string(),
+            content: line.to_string(),
+            old_line_num: Some(line_num),
+            new_line_num: None,
+            highlights,
+        });
+    }
+
+    let hunk = Hunk {
+        header: format!("@@ -1,{} +0,0 @@ Deleted file", line_count),
+        old_start: 1,
+        old_lines: line_count,
+        new_start: 0,
+        new_lines: 0,
+        lines: diff_lines,
+    };
+
+    (
+        vec![hunk],
+        DiffStats {
+            additions: 0,
+            deletions: line_count,
+        },
+    )
 }

@@ -8,7 +8,7 @@
     "url": "https://github.com/tamarazuk/revi"
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "pnpm --filter @revi/desktop tauri dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
