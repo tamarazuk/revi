@@ -90,6 +90,7 @@ pnpm build      # Full build (ask user)
 - **Tauri commands**: Rust in `src-tauri/src/commands/` — session, git, highlight, window
 - **Hooks**: `src/hooks/` — useDiff, useKeyboardManager, useDiffNavigation
 - **Tree-sitter**: Full-file highlighting in Rust, mapped to diff lines
+- **Icons**: Use `@phosphor-icons/react` with the `Icon` suffix (e.g., `CopyIcon`, `CodeBlockIcon`). The old names without suffix are deprecated.
 
 ### Reference Docs
 - `docs/HANDOFF.md` — Current state, architecture, what's next

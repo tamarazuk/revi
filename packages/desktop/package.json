@@ -15,16 +15,17 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@revi/shared": "workspace:*",
+    "@tanstack/react-virtual": "^3.8.1",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.0",
-    "@tanstack/react-virtual": "^3.8.1",
+    "clsx": "^2.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^4.5.2",
-    "clsx": "^2.1.1"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
