@@ -1,39 +1,112 @@
+import { useMemo, useEffect } from 'react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
-import { FileTreeItem } from '../sidebar/FileTreeItem';
+import { useSidebarStore, expandAllDirs } from '../../stores/sidebar';
+import { useFileNavigation } from '../../hooks/useFileNavigation';
+import { FileFilter } from '../sidebar/FileFilter';
+import { DirectoryGroup } from '../sidebar/DirectoryGroup';
 import { ResizeHandle } from './ResizeHandle';
 import type { FileEntry } from '@revi/shared';
 
 export function Sidebar() {
   const { session, selectedFile, selectFile } = useSessionStore();
   const { sidebarVisible, sidebarWidth } = useUIStore();
+  const { filter, expandedDirs } = useSidebarStore();
+
+  // Filter files based on current filter state
+  const filteredFiles = useMemo(() => {
+    if (!session) return [];
+
+    return session.files.filter((file) => {
+      // Status filter
+      if (filter.status.length > 0 && !filter.status.includes(file.status)) {
+        return false;
+      }
+
+      // Search filter
+      if (filter.searchQuery) {
+        const query = filter.searchQuery.toLowerCase();
+        if (!file.path.toLowerCase().includes(query)) {
+          return false;
+        }
+      }
+
+      // Viewed filter would go here when we have viewed state
+
+      return true;
+    });
+  }, [session, filter]);
+
+  // Group files by directory
+  const groupedFiles = useMemo(() => {
+    return groupFilesByDirectory(filteredFiles);
+  }, [filteredFiles]);
+
+  // Get all directory paths for expand all functionality
+  const allDirs = useMemo(() => {
+    return Object.keys(groupedFiles).filter((dir) => dir !== '');
+  }, [groupedFiles]);
+
+  // Auto-expand all directories on initial load
+  useEffect(() => {
+    if (allDirs.length > 0 && expandedDirs.size === 0) {
+      expandAllDirs(allDirs);
+    }
+  }, [allDirs, expandedDirs.size]);
+
+  // Keyboard navigation
+  const { focusedFile } = useFileNavigation({
+    files: filteredFiles,
+    selectedFile,
+    onSelectFile: selectFile,
+    enabled: sidebarVisible,
+  });
 
   if (!session || !sidebarVisible) return null;
 
-  // Group files by directory
-  const groupedFiles = groupFilesByDirectory(session.files);
+  const hasActiveFilters =
+    filter.status.length > 0 ||
+    filter.searchQuery !== '' ||
+    filter.viewedState !== 'all';
 
   return (
     <aside className="sidebar" style={{ width: sidebarWidth }}>
       <div className="sidebar__header">
         <span className="sidebar__title">Files changed</span>
-        <span className="sidebar__count">{session.files.length}</span>
+        <span className="sidebar__count">
+          {hasActiveFilters
+            ? `${filteredFiles.length}/${session.files.length}`
+            : session.files.length}
+        </span>
       </div>
 
+      <FileFilter />
+
       <div className="sidebar__tree">
-        {Object.entries(groupedFiles).map(([dir, files]) => (
-          <div key={dir} className="sidebar__group">
-            {dir && <div className="sidebar__dir">{dir}</div>}
-            {files.map((file) => (
-              <FileTreeItem
-                key={file.path}
-                file={file}
-                isSelected={selectedFile === file.path}
-                onSelect={() => selectFile(file.path)}
-              />
-            ))}
+        {filteredFiles.length === 0 ? (
+          <div className="sidebar__empty">
+            {hasActiveFilters
+              ? 'No files match the current filter'
+              : 'No changed files'}
           </div>
-        ))}
+        ) : (
+          Object.entries(groupedFiles).map(([dir, files]) => (
+            <DirectoryGroup
+              key={dir || '__root__'}
+              dirPath={dir}
+              files={files}
+              selectedFile={selectedFile}
+              onSelectFile={selectFile}
+              focusedFile={focusedFile}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="sidebar__footer">
+        <span className="sidebar__hint">
+          <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>Enter</kbd> open
+        </span>
       </div>
 
       <ResizeHandle />
@@ -54,5 +127,17 @@ function groupFilesByDirectory(files: FileEntry[]): Record<string, FileEntry[]> 
     groups[dir].push(file);
   }
 
-  return groups;
+  // Sort directories alphabetically, with root files first
+  const sortedGroups: Record<string, FileEntry[]> = {};
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    if (a === '') return -1;
+    if (b === '') return 1;
+    return a.localeCompare(b);
+  });
+
+  for (const key of sortedKeys) {
+    sortedGroups[key] = groups[key];
+  }
+
+  return sortedGroups;
 }

@@ -4,16 +4,18 @@ import type { FileEntry } from '@revi/shared';
 interface FileTreeItemProps {
   file: FileEntry;
   isSelected: boolean;
+  isFocused?: boolean;
   onSelect: () => void;
 }
 
-export function FileTreeItem({ file, isSelected, onSelect }: FileTreeItemProps) {
+export function FileTreeItem({ file, isSelected, isFocused, onSelect }: FileTreeItemProps) {
   const fileName = file.path.split('/').pop() || file.path;
 
   return (
     <button
       className={clsx('file-tree-item', {
         'file-tree-item--selected': isSelected,
+        'file-tree-item--focused': isFocused,
         'file-tree-item--added': file.status === 'added',
         'file-tree-item--modified': file.status === 'modified',
         'file-tree-item--deleted': file.status === 'deleted',
