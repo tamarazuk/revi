@@ -38,11 +38,11 @@
 ### Recent Git History
 
 ```
+c6d3915 fix(desktop): sanitize window dimensions to prevent rendering corruption
+230d074 feat(desktop): add Phosphor Icons and replace inline SVGs
 6df7838 feat(desktop): add file interactions and zoom support (Phase 9)
 705d828 feat(desktop): add multi-window management and update handoff (Phase 8)
 00daead feat(desktop): add keyboard navigation, hunk collapse, and help overlay (Phase 7)
-20c0668 fix: address 20 codebase review issues across security, correctness, and quality
-8a098bb feat(desktop): add comparisson mode switcher
 ```
 
 ---
@@ -182,6 +182,8 @@ Each Tauri 2 window runs its own webview with a separate JavaScript execution co
 ### Window state persistence
 
 Window states are saved to `{app_data_dir}/window-states.json` containing an array of `WindowInfo` objects. On close, states are persisted. On relaunch, `restore_windows()` reads this file and recreates windows at their saved positions/sizes with their previous projects.
+
+**Dimension sanitization**: Restored window dimensions are validated against reasonable bounds (800-8000 width, 600-5000 height). Invalid values fall back to defaults (1400x900). This prevents corrupted state files from causing GPU compositing failures on retina displays.
 
 ---
 
