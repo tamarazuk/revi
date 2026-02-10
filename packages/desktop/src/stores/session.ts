@@ -3,6 +3,48 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ReviewManifest, ComparisonMode } from '@revi/shared';
 import { useReviewStateStore } from './reviewState';
 
+const COMPARISON_MODE_STORAGE_KEY = 'revi:comparison-modes';
+
+function isComparisonMode(value: unknown): value is ComparisonMode {
+  if (!value || typeof value !== 'object') return false;
+  const mode = value as { type?: unknown };
+
+  if (mode.type === 'uncommitted') return true;
+  if (mode.type === 'branch') {
+    return typeof (value as { baseBranch?: unknown }).baseBranch === 'string';
+  }
+  if (mode.type === 'custom') {
+    const custom = value as { baseRef?: unknown; headRef?: unknown };
+    return typeof custom.baseRef === 'string' && typeof custom.headRef === 'string';
+  }
+
+  return false;
+}
+
+function getStoredComparisonMode(repoPath: string): ComparisonMode | null {
+  try {
+    const raw = localStorage.getItem(COMPARISON_MODE_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const value = parsed[repoPath];
+    return isComparisonMode(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeComparisonMode(repoPath: string, mode: ComparisonMode): void {
+  try {
+    const raw = localStorage.getItem(COMPARISON_MODE_STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, ComparisonMode>) : {};
+    parsed[repoPath] = mode;
+    localStorage.setItem(COMPARISON_MODE_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface LastSession {
   repoPath: string;
   baseRef: string | null;
@@ -60,12 +102,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      const preferredMode = getStoredComparisonMode(repoPath);
+
       // Create a new session from the repository
       const manifest = await invoke<ReviewManifest>('create_session_from_repo', { 
         repoPath, 
         baseRef: baseRef || null,
-        mode: null,
+        mode: preferredMode,
       });
+
+      if (manifest.comparisonMode) {
+        storeComparisonMode(repoPath, manifest.comparisonMode);
+      }
 
       // Save this as the last session for persistence
       await invoke('save_last_session', {
@@ -100,6 +148,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         baseRef: null,
         mode,
       });
+
+      storeComparisonMode(repoPath, manifest.comparisonMode ?? mode);
 
       // Save this as the last session for persistence
       await invoke('save_last_session', {
@@ -136,11 +186,16 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       }
 
       // Try to load the session from the saved repo path
+      const preferredMode = getStoredComparisonMode(lastSession.repoPath);
       const manifest = await invoke<ReviewManifest>('create_session_from_repo', {
         repoPath: lastSession.repoPath,
         baseRef: lastSession.baseRef,
-        mode: null,
+        mode: preferredMode,
       });
+
+      if (manifest.comparisonMode) {
+        storeComparisonMode(lastSession.repoPath, manifest.comparisonMode);
+      }
 
       set({
         session: manifest,
@@ -193,6 +248,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         baseRef: null,
         mode,
       });
+
+      if (manifest.comparisonMode) {
+        storeComparisonMode(session.repoRoot, manifest.comparisonMode);
+      }
 
       // Try to preserve the selected file if it still exists
       const preservedFile = manifest.files.find((f) => f.path === selectedFile);

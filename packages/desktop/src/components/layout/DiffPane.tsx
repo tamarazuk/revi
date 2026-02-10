@@ -119,6 +119,7 @@ export function DiffPane() {
                 diff={diff}
                 repoRoot={session.repoRoot}
                 filePath={file.path}
+                isNewFile={file.status === 'added'}
                 collapsedHunks={collapsedHunks}
                 onToggleHunk={onToggleHunk}
               />

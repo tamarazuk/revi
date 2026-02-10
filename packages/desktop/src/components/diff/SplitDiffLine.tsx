@@ -6,15 +6,30 @@ import type { LinePair } from './SplitView';
 
 interface SplitDiffLineProps {
   pair: LinePair;
+  fullWidthNewFile?: boolean;
   onOldContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
   onNewContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
 }
 
 export const SplitDiffLine = memo(function SplitDiffLine({
   pair,
+  fullWidthNewFile = false,
   onOldContextMenu,
   onNewContextMenu,
 }: SplitDiffLineProps) {
+  if (fullWidthNewFile && !pair.oldLine && pair.newLine) {
+    return (
+      <div className="split-diff-line split-diff-line--full-width">
+        <SplitSide
+          line={pair.newLine}
+          side="new"
+          fullWidth
+          onContextMenu={onNewContextMenu}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="split-diff-line">
       <SplitSide line={pair.oldLine} side="old" onContextMenu={onOldContextMenu} />
@@ -26,10 +41,11 @@ export const SplitDiffLine = memo(function SplitDiffLine({
 interface SplitSideProps {
   line: DiffLineType | null;
   side: 'old' | 'new';
+  fullWidth?: boolean;
   onContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
 }
 
-function SplitSide({ line, side, onContextMenu }: SplitSideProps) {
+function SplitSide({ line, side, fullWidth = false, onContextMenu }: SplitSideProps) {
   if (!line) {
     // Empty side (no corresponding line)
     return (
@@ -46,6 +62,7 @@ function SplitSide({ line, side, onContextMenu }: SplitSideProps) {
   return (
     <div
       className={clsx('split-side', `split-side--${side}`, {
+        'split-side--full-width': fullWidth,
         'split-side--added': line.type === 'added',
         'split-side--deleted': line.type === 'deleted',
         'split-side--context': line.type === 'context',

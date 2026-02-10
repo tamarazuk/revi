@@ -12,6 +12,7 @@ interface SplitViewProps {
   diff: FileDiff;
   repoRoot: string;
   filePath: string;
+  isNewFile: boolean;
   collapsedHunks: Set<number>;
   onToggleHunk: (hunkIndex: number) => void;
 }
@@ -26,7 +27,14 @@ type SplitRow =
   | { type: 'hunk-header'; hunk: Hunk; hunkIndex: number }
   | { type: 'line-pair'; pair: LinePair; hunkIndex: number; pairIndex: number };
 
-export function SplitView({ diff, repoRoot, filePath, collapsedHunks, onToggleHunk }: SplitViewProps) {
+export function SplitView({
+  diff,
+  repoRoot,
+  filePath,
+  isNewFile,
+  collapsedHunks,
+  onToggleHunk,
+}: SplitViewProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const closeMenuTimerRef = useRef<number | null>(null);
   const activeHunkIndex = useKeyboardStore((s) => s.activeHunkIndex);
@@ -197,6 +205,7 @@ export function SplitView({ diff, repoRoot, filePath, collapsedHunks, onToggleHu
                 ) : (
                   <SplitDiffLine
                     pair={row.pair}
+                    fullWidthNewFile={isNewFile}
                     onOldContextMenu={(e, line) => handleLineContextMenu(e, line, row.hunkIndex)}
                     onNewContextMenu={(e, line) => handleLineContextMenu(e, line, row.hunkIndex)}
                   />
