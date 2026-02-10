@@ -2,6 +2,7 @@ use lru::LruCache;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use similar::{Algorithm, ChangeTag, TextDiff};
 use std::num::NonZeroUsize;
 use std::process::Command;
 use std::sync::Mutex;
@@ -378,6 +379,8 @@ fn parse_diff_with_highlights(
         hunks.push(hunk);
     }
 
+    apply_word_level_highlights(&mut hunks);
+
     (
         hunks,
         DiffStats {
@@ -385,6 +388,210 @@ fn parse_diff_with_highlights(
             deletions: total_deletions,
         },
     )
+}
+
+fn apply_word_level_highlights(hunks: &mut [Hunk]) {
+    for hunk in hunks.iter_mut() {
+        let mut i = 0usize;
+
+        while i < hunk.lines.len() {
+            if hunk.lines[i].line_type != "deleted" {
+                i += 1;
+                continue;
+            }
+
+            let deleted_start = i;
+            while i < hunk.lines.len() && hunk.lines[i].line_type == "deleted" {
+                i += 1;
+            }
+            let deleted_end = i;
+
+            let added_start = i;
+            while i < hunk.lines.len() && hunk.lines[i].line_type == "added" {
+                i += 1;
+            }
+            let added_end = i;
+
+            if added_start == added_end {
+                continue;
+            }
+
+            let pair_count = (deleted_end - deleted_start).max(added_end - added_start);
+
+            for offset in 0..pair_count {
+                let deleted_idx = deleted_start + offset;
+                let added_idx = added_start + offset;
+
+                if deleted_idx >= deleted_end || added_idx >= added_end {
+                    continue;
+                }
+
+                let (left, right) = hunk.lines.split_at_mut(added_idx);
+                let deleted_line = &mut left[deleted_idx];
+                let added_line = &mut right[0];
+
+                let (deleted_ranges, added_ranges) =
+                    compute_word_change_ranges(&deleted_line.content, &added_line.content);
+
+                if !deleted_ranges.is_empty() {
+                    deleted_line.highlights = merge_word_highlights(
+                        &deleted_line.content,
+                        &deleted_line.highlights,
+                        &deleted_ranges,
+                        "word-deleted",
+                    );
+                }
+
+                if !added_ranges.is_empty() {
+                    added_line.highlights = merge_word_highlights(
+                        &added_line.content,
+                        &added_line.highlights,
+                        &added_ranges,
+                        "word-added",
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn compute_word_change_ranges(
+    old_line: &str,
+    new_line: &str,
+) -> (Vec<(usize, usize)>, Vec<(usize, usize)>) {
+    let diff = TextDiff::configure()
+        .algorithm(Algorithm::Myers)
+        .diff_words(old_line, new_line);
+
+    let mut old_ranges = Vec::new();
+    let mut new_ranges = Vec::new();
+    let mut old_pos = 0usize;
+    let mut new_pos = 0usize;
+
+    for change in diff.iter_all_changes() {
+        let len = change.value().len();
+        match change.tag() {
+            ChangeTag::Delete => {
+                if len > 0 {
+                    old_ranges.push((old_pos, old_pos + len));
+                }
+                old_pos += len;
+            }
+            ChangeTag::Insert => {
+                if len > 0 {
+                    new_ranges.push((new_pos, new_pos + len));
+                }
+                new_pos += len;
+            }
+            ChangeTag::Equal => {
+                old_pos += len;
+                new_pos += len;
+            }
+        }
+    }
+
+    (merge_ranges(old_ranges), merge_ranges(new_ranges))
+}
+
+fn merge_ranges(mut ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    if ranges.is_empty() {
+        return ranges;
+    }
+
+    ranges.sort_by_key(|(start, _)| *start);
+    let mut merged = Vec::new();
+    let mut current = ranges[0];
+
+    for (start, end) in ranges.into_iter().skip(1) {
+        if start <= current.1 {
+            current.1 = current.1.max(end);
+        } else {
+            merged.push(current);
+            current = (start, end);
+        }
+    }
+
+    merged.push(current);
+    merged
+}
+
+fn merge_word_highlights(
+    content: &str,
+    syntax_spans: &[HighlightSpan],
+    word_ranges: &[(usize, usize)],
+    word_scope: &str,
+) -> Vec<HighlightSpan> {
+    let len = content.len();
+    if len == 0 {
+        return Vec::new();
+    }
+
+    let mut syntax_by_byte: Vec<Option<&str>> = vec![None; len];
+    for span in syntax_spans {
+        let start = (span.start as usize).min(len);
+        let end = (span.end as usize).min(len);
+        if start >= end {
+            continue;
+        }
+
+        for slot in syntax_by_byte.iter_mut().take(end).skip(start) {
+            *slot = Some(span.scope.as_str());
+        }
+    }
+
+    let mut word_mask = vec![false; len];
+    for (start, end) in word_ranges {
+        let start = (*start).min(len);
+        let end = (*end).min(len);
+        if start >= end {
+            continue;
+        }
+
+        for slot in word_mask.iter_mut().take(end).skip(start) {
+            *slot = true;
+        }
+    }
+
+    let mut merged = Vec::new();
+    let mut idx = 0usize;
+
+    while idx < len {
+        let scope = if word_mask[idx] {
+            Some(word_scope)
+        } else {
+            syntax_by_byte[idx]
+        };
+
+        let Some(scope) = scope else {
+            idx += 1;
+            continue;
+        };
+
+        let start = idx;
+        idx += 1;
+
+        while idx < len {
+            let next_scope = if word_mask[idx] {
+                Some(word_scope)
+            } else {
+                syntax_by_byte[idx]
+            };
+
+            if next_scope != Some(scope) {
+                break;
+            }
+
+            idx += 1;
+        }
+
+        merged.push(HighlightSpan {
+            start: start as u32,
+            end: idx as u32,
+            scope: scope.to_string(),
+        });
+    }
+
+    merged
 }
 
 fn parse_hunk_header(line: &str) -> Option<(u32, u32, u32, u32)> {

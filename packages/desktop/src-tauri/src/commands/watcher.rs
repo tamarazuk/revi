@@ -84,7 +84,11 @@ const IGNORED_PREFIXES: &[&str] = &[
 /// Git ref paths we selectively allow through the .git/ ignore rule.
 /// Changes to these indicate branch switches, commits, rebases, etc.
 fn is_git_ref_path(relative_path: &str) -> bool {
-    relative_path == ".git/HEAD" || relative_path.starts_with(".git/refs/")
+    if relative_path == ".git/HEAD" {
+        return true;
+    }
+
+    relative_path.starts_with(".git/refs/") && !relative_path.ends_with(".lock")
 }
 
 /// Read the current HEAD SHA for a repository via `git rev-parse HEAD`
@@ -206,12 +210,14 @@ pub fn start_watching(app_handle: AppHandle, repo_root: String) -> Result<(), St
     // Debounce: collect events over this window before emitting
     let debounce_duration = Duration::from_millis(500);
     let last_emit = std::sync::Arc::new(Mutex::new(Instant::now() - debounce_duration));
+    let last_head_sha = std::sync::Arc::new(Mutex::new(read_head_sha(&repo_path)));
 
     // Track if we have pending changes (for coalescing rapid events)
     let pending_change = std::sync::Arc::new(Mutex::new(false));
 
     let pending_clone = pending_change.clone();
     let last_emit_clone = last_emit.clone();
+    let last_head_sha_clone = last_head_sha.clone();
     let repo_path_clone = repo_path.clone();
 
     let watcher = RecommendedWatcher::new(
@@ -222,6 +228,7 @@ pub fn start_watching(app_handle: AppHandle, repo_root: String) -> Result<(), St
                     &repo_path_clone,
                     &app_handle_clone,
                     &last_emit_clone,
+                    &last_head_sha_clone,
                     &pending_clone,
                     debounce_duration,
                 );
@@ -259,6 +266,7 @@ fn handle_event(
     repo_root: &Path,
     app_handle: &AppHandle,
     last_emit: &std::sync::Arc<Mutex<Instant>>,
+    last_head_sha: &std::sync::Arc<Mutex<Option<String>>>,
     pending_change: &std::sync::Arc<Mutex<bool>>,
     debounce_duration: Duration,
 ) {
@@ -336,13 +344,24 @@ fn handle_event(
     // Emit ref_changed if git refs were modified (branch switch, commit, rebase)
     if has_ref_change {
         let new_head_sha = read_head_sha(repo_root);
-        let ref_event = ChangeEvent {
-            event_type: "ref_changed".to_string(),
-            repo_root: repo_root.to_string_lossy().to_string(),
-            paths: None,
-            new_head_sha,
+        let should_emit_ref_change = {
+            let mut previous_head_sha = last_head_sha.lock().unwrap();
+            let changed = *previous_head_sha != new_head_sha;
+            if changed {
+                *previous_head_sha = new_head_sha.clone();
+            }
+            changed
         };
-        let _ = app_handle.emit("repo-changed", ref_event);
+
+        if should_emit_ref_change {
+            let ref_event = ChangeEvent {
+                event_type: "ref_changed".to_string(),
+                repo_root: repo_root.to_string_lossy().to_string(),
+                paths: None,
+                new_head_sha,
+            };
+            let _ = app_handle.emit("repo-changed", ref_event);
+        }
     }
 
     // Emit file_changed if regular files were modified

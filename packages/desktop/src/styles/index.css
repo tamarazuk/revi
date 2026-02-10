@@ -1079,6 +1079,17 @@ body {
 .hl-escape { color: #79c0ff; }
 .hl-embedded { color: #ffa657; }
 
+/* Word-level diff highlights */
+.hl-word-added {
+  background-color: rgba(63, 185, 80, 0.28);
+  border-radius: 2px;
+}
+
+.hl-word-deleted {
+  background-color: rgba(248, 81, 73, 0.28);
+  border-radius: 2px;
+}
+
 /* Comparison Mode Dropdown */
 .comparison-mode-dropdown {
   position: relative;
