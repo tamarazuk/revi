@@ -389,7 +389,7 @@ See `docs/implementation-plan.md` for full task breakdown.
 
 1. **App launcher in CLI** - Just prints instructions, doesn't spawn app yet
 2. **TOML highlighting disabled** - tree-sitter-toml 0.20 incompatible with tree-sitter 0.24
-3. **Comparison mode persistence** - Last-used mode not yet persisted per repository
+3. **Auto-refresh mode** - Refresh currently requires banner action; optional no-banner auto-refresh mode is planned (debounced/coalesced, with state/scroll preservation)
 4. **`G` key (Shift+g)** - Fixed: separate `case 'G':` handler for last file navigation
 5. **Command palette** - Deferred from Phase 7, not yet implemented
 6. **Zoom persistence** - Zoom level resets on app restart (could persist to localStorage)

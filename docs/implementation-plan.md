@@ -575,8 +575,8 @@ interface VirtualRow {
 - [x] Render `DiffLine` with line type styling
 - [x] Apply syntax highlighting from Tree-sitter spans
 - [x] Implement line number gutters (both sides for split)
-- [ ] Add word-level diff highlighting within lines
-- [ ] Handle new files: full-width in split mode
+- [x] Add word-level diff highlighting within lines
+- [x] Handle new files: full-width in split mode
 - [x] Handle deleted files: show deletion context
 - [x] Handle renamed files: show old/new path
 - [x] Handle binary files: show "Binary file changed" message
@@ -1012,13 +1012,13 @@ components/
 - [x] Parse editor command template with placeholders
 - [x] Implement clipboard write command
 - [x] Add "Copy file path" action
-- [ ] Add "Copy file path + line" action
-- [ ] Add "Copy hunk as text" action
-- [ ] Implement file-level collapse in diff pane
+- [x] Add "Copy file path + line" action
+- [x] Add "Copy hunk as text" action
+- [x] Implement file-level collapse in diff pane
 - [x] Implement hunk-level collapse
-- [ ] Add "Collapse all" / "Expand all" buttons
+- [x] Add "Collapse all" / "Expand all" buttons
 - [x] Persist collapse state to review state
-- [ ] Add right-click context menu on lines
+- [x] Add right-click context menu on lines
 
 ### Deliverable
 Can open files in editor, copy paths, collapse/expand hunks.
@@ -1079,13 +1079,15 @@ components/
 
 - [x] Implement Rust file watcher with notify crate
 - [x] Filter out irrelevant changes (.revi/, node_modules/, etc.)
-- [ ] Detect git ref changes (HEAD, branch refs)
+- [x] Detect git ref changes (HEAD, branch refs)
 - [x] Emit change events to React frontend
 - [x] Create refresh banner component
 - [x] Implement "Refresh" action
-- [ ] On refresh: recompute manifest, apply fuzzy recovery
+- [x] On refresh: recompute manifest, apply fuzzy recovery
 - [x] Implement "Dismiss" action (ignore until next change)
 - [x] Show banner non-intrusively (top of diff pane, not modal)
+- [ ] Add optional auto-refresh mode (no banner) with debounce/coalescing and in-flight guard
+- [ ] Preserve scroll/hunk anchor when auto-refresh updates the current file
 
 ### Refresh Flow
 
