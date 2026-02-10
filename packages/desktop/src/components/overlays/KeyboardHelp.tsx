@@ -1,65 +1,11 @@
+import { useMemo } from 'react';
 import { useKeyboardStore } from '../../stores/keyboard';
-
-// Each shortcut has one or more key combos, each combo is an array of individual keys
-interface Shortcut {
-  keys: string[][];
-  label: string;
-}
+import { KEYBINDINGS } from '../../keyboard/keymap';
 
 interface ShortcutGroup {
   title: string;
-  shortcuts: Shortcut[];
+  shortcuts: { keys: string[][]; label: string }[];
 }
-
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { keys: [['j'], ['↓']], label: 'Next file' },
-      { keys: [['k'], ['↑']], label: 'Previous file' },
-      { keys: [['g']], label: 'First file' },
-      { keys: [['G']], label: 'Last file' },
-      { keys: [['Enter'], ['o']], label: 'Open file' },
-      { keys: [['n']], label: 'Next hunk' },
-      { keys: [['p']], label: 'Previous hunk' },
-    ],
-  },
-  {
-    title: 'Actions',
-    shortcuts: [
-      { keys: [['v']], label: 'Toggle viewed' },
-      { keys: [['[']], label: 'Collapse active hunk' },
-      { keys: [[']']], label: 'Expand active hunk' },
-      { keys: [['r']], label: 'Refresh (when changes detected)' },
-    ],
-  },
-  {
-    title: 'View',
-    shortcuts: [
-      { keys: [['s']], label: 'Toggle split/unified' },
-      { keys: [['b']], label: 'Toggle sidebar' },
-      { keys: [['?']], label: 'Toggle this help' },
-      { keys: [['Esc']], label: 'Close overlay' },
-    ],
-  },
-  {
-    title: 'Window',
-    shortcuts: [
-      { keys: [['⌘', 'N']], label: 'New window' },
-      { keys: [['⌘', '+']], label: 'Zoom in' },
-      { keys: [['⌘', '-']], label: 'Zoom out' },
-      { keys: [['⌘', '0']], label: 'Reset zoom' },
-    ],
-  },
-  {
-    title: 'File',
-    shortcuts: [
-      { keys: [['⌘', '⇧', 'O']], label: 'Open in editor' },
-      { keys: [['⌘', 'C']], label: 'Copy relative path' },
-      { keys: [['⌘', '⇧', 'C']], label: 'Copy absolute path' },
-    ],
-  },
-];
 
 function KeyCombo({ keys }: { keys: string[] }) {
   return (
@@ -74,6 +20,25 @@ function KeyCombo({ keys }: { keys: string[] }) {
 export function KeyboardHelp() {
   const { helpOverlayOpen, closeHelpOverlay } = useKeyboardStore();
 
+  const shortcutGroups = useMemo<ShortcutGroup[]>(() => {
+    const groups: ShortcutGroup[] = [];
+
+    for (const binding of KEYBINDINGS) {
+      let group = groups.find((g) => g.title === binding.group);
+      if (!group) {
+        group = { title: binding.group, shortcuts: [] };
+        groups.push(group);
+      }
+
+      group.shortcuts.push({
+        label: binding.label,
+        keys: binding.combos.map((combo) => combo.displayKeys),
+      });
+    }
+
+    return groups;
+  }, []);
+
   if (!helpOverlayOpen) return null;
 
   return (
@@ -86,7 +51,7 @@ export function KeyboardHelp() {
           </button>
         </div>
         <div className="modal__body keyboard-help__body">
-          {SHORTCUT_GROUPS.map((group) => (
+          {shortcutGroups.map((group) => (
             <div key={group.title} className="keyboard-help__group">
               <h3 className="keyboard-help__group-title">{group.title}</h3>
               <div className="keyboard-help__list">
