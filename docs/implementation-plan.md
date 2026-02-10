@@ -142,7 +142,7 @@ packages/cli/src/
 - [x] Write manifest to `.revi/sessions/<session-id>.json`
 - [x] Scaffold `.revi/` directory on first run
 - [x] Offer to add `.revi/` to `.gitignore`
-- [ ] Implement app launcher (spawn Tauri app or signal via IPC)
+- [x] Implement app launcher (spawn Tauri app or signal via IPC)
 
 ### CLI Interface
 
@@ -713,11 +713,11 @@ pub fn recover_state(
 - [x] Define `PersistedState` schema in shared package
 - [x] Implement `load_review_state` Tauri command
 - [x] Implement `save_review_state` Tauri command
-- [ ] Implement `recover_state` logic in Rust
+- [x] Implement `recover_state` logic in Rust
 - [x] Create Zustand store with persistence middleware
 - [x] Auto-save state on viewed/collapse/scroll changes (debounced)
 - [x] Load state on session open
-- [ ] Trigger recovery when SHA mismatch detected
+- [x] Trigger recovery when SHA mismatch detected
 - [ ] Show "Changed since last view" badge in sidebar
 - [ ] Show diff delta in tooltip ("was +12/-3, now +15/-3")
 - [x] Track review progress in TopBar ("14/23 files viewed")
@@ -801,7 +801,7 @@ fn list_recent_commits(
 - [x] Create `ComparisonModeDropdown` component
 - [x] Create `CustomComparisonModal` with branch/commit picker
 - [x] Update TopBar to show current mode with dropdown
-- [ ] Persist last-used mode per repository
+- [x] Persist last-used mode per repository
 - [x] Handle mode switching (reload session with new mode)
 - [x] Show clear indication when viewing uncommitted vs branch changes
 
@@ -869,7 +869,7 @@ components/
 - [x] Create keyboard help overlay (`?`)
 - [x] Handle modifier keys (Cmd, Shift, Ctrl, Alt)
 - [x] Prevent conflicts with system shortcuts
-- [ ] Add visual feedback for actions (e.g., brief highlight on navigation)
+- [x] Add visual feedback for actions (e.g., brief highlight on navigation)
 
 ### Keyboard Help Overlay
 
@@ -1086,8 +1086,8 @@ components/
 - [x] On refresh: recompute manifest, apply fuzzy recovery
 - [x] Implement "Dismiss" action (ignore until next change)
 - [x] Show banner non-intrusively (top of diff pane, not modal)
-- [ ] Add optional auto-refresh mode (no banner) with debounce/coalescing and in-flight guard
-- [ ] Preserve scroll/hunk anchor when auto-refresh updates the current file
+- [x] Add optional auto-refresh mode (no banner) with debounce/coalescing and in-flight guard
+- [x] Preserve scroll/hunk anchor when auto-refresh updates the current file
 
 ### Refresh Flow
 
@@ -1157,9 +1157,9 @@ components/
 - [ ] Add "Show hidden files" toggle
 - [ ] Implement whitespace toggle in TopBar
 - [ ] Re-fetch diffs with `-w` flag when whitespace hidden
-- [ ] Add image preview support for binary image files in DiffPane
-- [ ] Show image metadata (format + dimensions + size) when preview is available
-- [ ] Add fallback message for unsupported binary/image formats
+- [x] Add image preview support for binary image files in DiffPane
+- [x] Show image metadata (format + dimensions + size) when preview is available
+- [x] Add fallback message for unsupported binary/image formats
 - [ ] Apply default diff mode from config
 - [ ] Apply default base from config (in CLI)
 - [ ] Validate config file and show errors gracefully
@@ -1468,7 +1468,7 @@ describe('detectRepo', () => {
 - [ ] Add unit tests for `git.rs` caching logic
 - [ ] Add unit tests for `session.rs` session creation
 - [ ] Add unit tests for `session.rs` state persistence
-- [ ] Add unit tests for `file_ops.rs` editor command parsing
+- [x] Add unit tests for `file_ops.rs` editor command parsing
 - [ ] Extend `highlight.rs` tests for edge cases
 
 **React Tests (Days 4-5)**
@@ -1577,7 +1577,7 @@ See **Phase 13** for detailed test implementation plan.
 
 ## Definition of Done (MVP + v1.75)
 
-- [ ] `revi .` generates manifest and launches app
+- [x] `revi .` generates manifest and launches app
 - [x] App shows changed files with status and stats
 - [x] Split and unified diff modes work
 - [x] Syntax highlighting works for common languages
