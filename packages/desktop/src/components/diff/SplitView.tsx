@@ -136,6 +136,16 @@ export function SplitView({ diff, repoRoot, filePath, collapsedHunks, onToggleHu
     });
   };
 
+  const handleCopyPathWithLine = () => {
+    if (!contextTarget) return;
+    const line = contextTarget.line.newLineNum ?? contextTarget.line.oldLineNum;
+    if (!line) return;
+
+    invoke('copy_to_clipboard', { content: `${filePath}:${line}` }).catch((err) => {
+      console.error('Failed to copy path with line to clipboard:', err);
+    });
+  };
+
   const contextMenuItems = [
     {
       label: copiedAction === 'line' ? 'Copied line ✓' : 'Copy Line',
@@ -147,6 +157,7 @@ export function SplitView({ diff, repoRoot, filePath, collapsedHunks, onToggleHu
       onClick: handleCopyHunk,
       closeOnClick: false,
     },
+    { label: 'Copy Path:Line', onClick: handleCopyPathWithLine },
     { label: 'Open in Editor', onClick: handleOpenInEditor },
   ];
 
