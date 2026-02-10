@@ -1,6 +1,14 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="128" height="128" rx="24" fill="#1a1a1a"/>
-  <rect x="18" y="40" width="80" height="12" rx="6" fill="#2ea043"/>
-  <rect x="30" y="60" width="80" height="12" rx="6" fill="#f85149"/>
-  <rect x="24" y="80" width="80" height="12" rx="6" fill="#2ea043"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 128 128" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <path d="M128,24L128,104C128,117.246 117.246,128 104,128L24,128C10.754,128 0,117.246 0,104L0,24C0,10.754 10.754,0 24,0L104,0C117.246,0 128,10.754 128,24Z" style="fill:rgb(26,26,26);"/>
+    <g transform="matrix(1,0,0,1,8,-6)">
+        <path d="M98,46C98,49.311 95.311,52 92,52L24,52C20.689,52 18,49.311 18,46C18,42.689 20.689,40 24,40L92,40C95.311,40 98,42.689 98,46Z" style="fill:rgb(46,160,67);"/>
+    </g>
+    <g transform="matrix(1,0,0,1,-8,-2)">
+        <path d="M110,66C110,69.311 107.311,72 104,72L36,72C32.689,72 30,69.311 30,66C30,62.689 32.689,60 36,60L104,60C107.311,60 110,62.689 110,66Z" style="fill:rgb(248,81,73);"/>
+    </g>
+    <g transform="matrix(1,0,0,1,2,2)">
+        <path d="M104,86C104,89.311 101.311,92 98,92L30,92C26.689,92 24,89.311 24,86C24,82.689 26.689,80 30,80L98,80C101.311,80 104,82.689 104,86Z" style="fill:rgb(46,160,67);"/>
+    </g>
 </svg>
