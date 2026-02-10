@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { CodeBlockIcon, CopyIcon } from '@phosphor-icons/react';
+import { ArrowsInIcon, ArrowsOutIcon, CodeBlockIcon, CopyIcon } from '@phosphor-icons/react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useReviewStateStore } from '../../stores/reviewState';
@@ -174,38 +174,41 @@ function DiffHeader({ file, repoRoot, isCollapsed, onToggleCollapse, hunkCount, 
         )}
         <span className="diff-pane__path">{file.path}</span>
         <div className="diff-pane__actions">
-          {!isCollapsed && hunkCount > 1 && (
-            <>
-              <button
-                className="diff-pane__action"
-                onClick={onCollapseAllHunks}
-                title="Collapse all hunks"
-              >
-                Collapse all
-              </button>
-              <button
-                className="diff-pane__action"
-                onClick={onExpandAllHunks}
-                title="Expand all hunks"
-              >
-                Expand all
-              </button>
-            </>
-          )}
           <button
-            className="diff-pane__action"
+            className="diff-pane__action diff-pane__action--icon"
             onClick={handleCopyPath}
             title="Copy relative path (⌘C)"
           >
             <CopyIcon size={16} />
           </button>
           <button
-            className="diff-pane__action"
+            className="diff-pane__action diff-pane__action--icon"
             onClick={handleOpenInEditor}
             title="Open in editor (⌘⇧O)"
           >
             <CodeBlockIcon size={16} />
           </button>
+          {!isCollapsed && hunkCount > 1 && (
+            <>
+              <span className="diff-pane__actions-divider" aria-hidden="true" />
+              <button
+                className="diff-pane__action diff-pane__action--icon"
+                onClick={onCollapseAllHunks}
+                title="Collapse all hunks"
+                aria-label="Collapse all hunks"
+              >
+                <ArrowsInIcon size={16} />
+              </button>
+              <button
+                className="diff-pane__action diff-pane__action--icon"
+                onClick={onExpandAllHunks}
+                title="Expand all hunks"
+                aria-label="Expand all hunks"
+              >
+                <ArrowsOutIcon size={16} />
+              </button>
+            </>
+          )}
         </div>
       </div>
       <span className="diff-pane__stats">
