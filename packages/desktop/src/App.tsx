@@ -3,9 +3,9 @@ import { Sidebar } from './components/layout/Sidebar';
 import { DiffPane } from './components/layout/DiffPane';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { KeyboardHelp } from './components/overlays/KeyboardHelp';
-import { RefreshBanner } from './components/overlays/RefreshBanner';
 import { useSessionStore } from './stores/session';
 import { useReviewStateStore } from './stores/reviewState';
+import { KEYBINDINGS, matchesKeybinding } from './keyboard/keymap';
 import { useKeyboardManager } from './hooks/useKeyboardManager';
 import { useEffect, useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -21,11 +21,19 @@ interface ChangeEvent {
 }
 
 export function App() {
-  const { session, isLoading, error, loadSession, loadSessionFromRepo, loadLastSession, refreshSession, clearError } = useSessionStore();
+  const {
+    session,
+    isLoading,
+    error,
+    loadSession,
+    loadSessionFromRepo,
+    loadLastSession,
+    refreshSession,
+    clearError,
+  } = useSessionStore();
   const { loadState: loadReviewState, reset: resetReviewState } = useReviewStateStore();
   const [isPickingFolder, setIsPickingFolder] = useState(false);
   const [initComplete, setInitComplete] = useState(false);
-  const [changesDetected, setChangesDetected] = useState(false);
 
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
@@ -79,7 +87,7 @@ export function App() {
   // Load review state when session changes
   useEffect(() => {
     if (session) {
-      const fileInfo = session.files.map(f => ({
+      const fileInfo = session.files.map((f) => ({
         path: f.path,
         contentHash: '',
         additions: f.additions,
@@ -117,11 +125,49 @@ export function App() {
   // File watcher: start watching when session loads, stop when it unloads
   useEffect(() => {
     if (!session) {
-      setChangesDetected(false);
       return;
     }
 
     const repoRoot = session.repoRoot;
+    const autoRefreshDebounceMs = 800;
+    let debounceTimer: number | null = null;
+    let refreshInFlight = false;
+    let refreshQueued = false;
+
+    const runRefresh = async () => {
+      if (refreshInFlight) {
+        refreshQueued = true;
+        return;
+      }
+
+      refreshInFlight = true;
+      try {
+        await refreshSession();
+      } catch (err) {
+        console.warn('Auto-refresh failed:', err);
+      } finally {
+        refreshInFlight = false;
+
+        if (refreshQueued) {
+          refreshQueued = false;
+          debounceTimer = window.setTimeout(() => {
+            debounceTimer = null;
+            void runRefresh();
+          }, autoRefreshDebounceMs);
+        }
+      }
+    };
+
+    const scheduleAutoRefresh = () => {
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer);
+      }
+
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null;
+        void runRefresh();
+      }, autoRefreshDebounceMs);
+    };
 
     // Start watching the repository
     invoke('start_watching', { repoRoot }).catch((err) => {
@@ -136,54 +182,60 @@ export function App() {
       if (event.payload.repoRoot !== repoRoot) {
         return;
       }
-      setChangesDetected(true);
+
+      const modeType = session.comparisonMode?.type;
+      const isUncommittedMode = modeType === 'uncommitted';
+      const isRefChange = event.payload.type === 'ref_changed';
+
+      // In branch/custom mode, ignore working-tree file changes.
+      // Only ref changes can affect the compared commits.
+      if (!isUncommittedMode && !isRefChange) {
+        return;
+      }
+
+      scheduleAutoRefresh();
     }).then((fn) => {
       unlisten = fn;
     });
 
     return () => {
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer);
+      }
+
       // Stop watching when session changes or component unmounts
       invoke('stop_watching', { repoRoot }).catch(() => {});
       if (unlisten) {
         unlisten();
       }
     };
-  }, [session?.repoRoot, session?.sessionId]);
+  }, [session?.repoRoot, session?.sessionId, refreshSession]);
 
-  // Refresh handler
-  const handleRefresh = useCallback(() => {
-    setChangesDetected(false);
+  // Manual refresh handler
+  const handleManualRefresh = useCallback(() => {
     refreshSession();
   }, [refreshSession]);
 
-  // Dismiss handler
-  const handleDismiss = useCallback(() => {
-    setChangesDetected(false);
-  }, []);
-
   // Keyboard shortcut for refresh (R key)
   useEffect(() => {
+    const refreshBinding = KEYBINDINGS.find((binding) => binding.id === 'refresh_detected');
+    if (!refreshBinding) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip when typing in inputs
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
 
-      // R key triggers refresh when changes are detected
-      if (e.key === 'r' || e.key === 'R') {
-        if (changesDetected) {
-          e.preventDefault();
-          handleRefresh();
-        }
+      if (matchesKeybinding(e, refreshBinding)) {
+        e.preventDefault();
+        handleManualRefresh();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [changesDetected, handleRefresh]);
+  }, [handleManualRefresh]);
 
   const handleOpenRepository = async () => {
     setIsPickingFolder(true);
@@ -193,17 +245,17 @@ export function App() {
         multiple: false,
         title: 'Select a Git Repository',
       });
-      
+
       if (selected) {
         const repoPath = selected as string;
         const currentWindow = getCurrentWebviewWindow();
-        
+
         // Check if this repo is already open in another window
         const existingWindow = await invoke<string | null>('find_window_by_repo', {
           repoPath,
           excludeLabel: currentWindow.label,
         });
-        
+
         if (existingWindow) {
           // Focus the existing window and close this one (if it has no session)
           const closeLabel = session ? null : currentWindow.label;
@@ -213,7 +265,7 @@ export function App() {
           });
           return;
         }
-        
+
         await loadSessionFromRepo(repoPath);
       }
     } catch (err) {
@@ -223,7 +275,7 @@ export function App() {
     }
   };
 
-  if (!initComplete || isLoading || isPickingFolder) {
+  if (!initComplete || isPickingFolder || (isLoading && !session)) {
     return (
       <div className="app app--empty">
         <div className="empty-state">
@@ -274,9 +326,6 @@ export function App() {
   return (
     <div className="app">
       <TopBar />
-      {changesDetected && (
-        <RefreshBanner onRefresh={handleRefresh} onDismiss={handleDismiss} />
-      )}
       <div className="app__body">
         <Sidebar />
         <ErrorBoundary>

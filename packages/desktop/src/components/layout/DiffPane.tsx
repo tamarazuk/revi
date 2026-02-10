@@ -96,10 +96,16 @@ export function DiffPane() {
       <DiffHeader file={file} repoRoot={session.repoRoot} isCollapsed={isFileCollapsedState} onToggleCollapse={onToggleFileCollapse} hunkCount={hunkCount} onCollapseAllHunks={onCollapseAllHunks} onExpandAllHunks={onExpandAllHunks} />
       {!isFileCollapsedState && (
         <div className="diff-pane__content">
-        {isLoading && (
+        {isLoading && !diff && (
           <div className="diff-loading">
             <span className="diff-loading__spinner" />
             Loading diff...
+          </div>
+        )}
+        {isLoading && diff && (
+          <div className="diff-loading diff-loading--subtle">
+            <span className="diff-loading__spinner" />
+            Updating...
           </div>
         )}
         {error && (
@@ -108,7 +114,7 @@ export function DiffPane() {
             <p className="dim">{error}</p>
           </div>
         )}
-        {diff && !isLoading && (
+        {diff && (
           <>
             {diff.hunks.length === 0 ? (
               <div className="diff-empty">

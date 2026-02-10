@@ -50,7 +50,7 @@ export const KEYBINDINGS: Keybinding[] = [
   { id: 'expand_hunk', group: 'Actions', label: 'Expand active hunk', scope: 'manager', combos: [
     { key: ']', displayKeys: [']'], caseSensitive: true },
   ] },
-  { id: 'refresh_detected', group: 'Actions', label: 'Refresh (when changes detected)', scope: 'app', combos: [
+  { id: 'refresh_detected', group: 'Actions', label: 'Refresh now', scope: 'app', combos: [
     { key: 'r', displayKeys: ['r'] },
   ] },
 
