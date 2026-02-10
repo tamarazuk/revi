@@ -8,6 +8,7 @@ interface ContextMenuProps {
     label: string;
     shortcut?: string;
     onClick: () => void;
+    closeOnClick?: boolean;
   }[];
 }
 
@@ -51,7 +52,9 @@ export function ContextMenu({ x, y, onClose, items }: ContextMenuProps) {
           className="context-menu__item"
           onClick={() => {
             item.onClick();
-            onClose();
+            if (item.closeOnClick ?? true) {
+              onClose();
+            }
           }}
         >
           <span className="context-menu__label">{item.label}</span>

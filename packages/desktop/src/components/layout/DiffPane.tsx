@@ -115,9 +115,21 @@ export function DiffPane() {
                 <p>No changes in this file</p>
               </div>
             ) : diffMode === 'split' ? (
-              <SplitView diff={diff} collapsedHunks={collapsedHunks} onToggleHunk={onToggleHunk} />
+              <SplitView
+                diff={diff}
+                repoRoot={session.repoRoot}
+                filePath={file.path}
+                collapsedHunks={collapsedHunks}
+                onToggleHunk={onToggleHunk}
+              />
             ) : (
-              <UnifiedView diff={diff} collapsedHunks={collapsedHunks} onToggleHunk={onToggleHunk} />
+              <UnifiedView
+                diff={diff}
+                repoRoot={session.repoRoot}
+                filePath={file.path}
+                collapsedHunks={collapsedHunks}
+                onToggleHunk={onToggleHunk}
+              />
             )}
           </>
         )}

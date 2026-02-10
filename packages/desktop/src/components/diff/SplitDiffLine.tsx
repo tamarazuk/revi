@@ -6,13 +6,19 @@ import type { LinePair } from './SplitView';
 
 interface SplitDiffLineProps {
   pair: LinePair;
+  onOldContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
+  onNewContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
 }
 
-export const SplitDiffLine = memo(function SplitDiffLine({ pair }: SplitDiffLineProps) {
+export const SplitDiffLine = memo(function SplitDiffLine({
+  pair,
+  onOldContextMenu,
+  onNewContextMenu,
+}: SplitDiffLineProps) {
   return (
     <div className="split-diff-line">
-      <SplitSide line={pair.oldLine} side="old" />
-      <SplitSide line={pair.newLine} side="new" />
+      <SplitSide line={pair.oldLine} side="old" onContextMenu={onOldContextMenu} />
+      <SplitSide line={pair.newLine} side="new" onContextMenu={onNewContextMenu} />
     </div>
   );
 });
@@ -20,9 +26,10 @@ export const SplitDiffLine = memo(function SplitDiffLine({ pair }: SplitDiffLine
 interface SplitSideProps {
   line: DiffLineType | null;
   side: 'old' | 'new';
+  onContextMenu?: (e: React.MouseEvent, line: DiffLineType) => void;
 }
 
-function SplitSide({ line, side }: SplitSideProps) {
+function SplitSide({ line, side, onContextMenu }: SplitSideProps) {
   if (!line) {
     // Empty side (no corresponding line)
     return (
@@ -43,6 +50,7 @@ function SplitSide({ line, side }: SplitSideProps) {
         'split-side--deleted': line.type === 'deleted',
         'split-side--context': line.type === 'context',
       })}
+      onContextMenu={onContextMenu ? (e) => onContextMenu(e, line) : undefined}
     >
       <span className="split-side__num">{lineNum ?? ''}</span>
       <span className="split-side__marker">
