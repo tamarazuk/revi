@@ -201,7 +201,7 @@ interface BinaryPreviewProps {
 interface BinaryPreviewPayload {
   mimeType: string;
   sizeBytes: number;
-  bytes: number[];
+  base64Data: string;
 }
 
 interface BinaryAsset {
@@ -238,9 +238,20 @@ function BinaryPreview({ repoRoot, baseSha, headSha, diffMode, file }: BinaryPre
       });
     };
 
+    const decodeBase64 = (base64Data: string): Uint8Array => {
+      const binary = window.atob(base64Data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    };
+
     const payloadToAsset = async (payload: BinaryPreviewPayload): Promise<BinaryAsset> => {
-      const uint8 = new Uint8Array(payload.bytes);
-      const blob = new Blob([uint8], { type: payload.mimeType });
+      const uint8 = decodeBase64(payload.base64Data);
+      const arrayBuffer = new ArrayBuffer(uint8.byteLength);
+      new Uint8Array(arrayBuffer).set(uint8);
+      const blob = new Blob([arrayBuffer], { type: payload.mimeType });
       const url = URL.createObjectURL(blob);
       objectUrls.push(url);
 
@@ -265,29 +276,21 @@ function BinaryPreview({ repoRoot, baseSha, headSha, diffMode, file }: BinaryPre
     const loadPreview = async () => {
       setIsLoading(true);
       try {
-        const currentPayload = await invokePreview();
+        const needsPrevious = isModified;
+        const [currentPayload, previousPayload] = await Promise.all([
+          invokePreview(),
+          needsPrevious ? invokePreview('deleted').catch(() => null) : Promise.resolve(null),
+        ]);
         if (!active) return;
 
         const current = await payloadToAsset(currentPayload);
         if (!active) return;
         setCurrentAsset(current);
 
-        if (
-          isModified &&
-          (currentPayload.mimeType.startsWith('image/') || currentPayload.mimeType === 'application/pdf')
-        ) {
-          try {
-            const previousPayload = await invokePreview('deleted');
-            if (!active) return;
-
-            if (previousPayload.mimeType === currentPayload.mimeType) {
-              const previous = await payloadToAsset(previousPayload);
-              if (!active) return;
-              setPreviousAsset(previous);
-            }
-          } catch {
-            // If "before" preview can't be loaded, keep "after" preview.
-          }
+        if (previousPayload && previousPayload.mimeType === currentPayload.mimeType) {
+          const previous = await payloadToAsset(previousPayload);
+          if (!active) return;
+          setPreviousAsset(previous);
         }
       } catch (err) {
         if (active) {

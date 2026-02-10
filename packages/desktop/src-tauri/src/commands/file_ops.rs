@@ -1,6 +1,8 @@
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_shell::ShellExt;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
@@ -180,7 +182,8 @@ pub struct BinaryPreview {
     pub mime_type: String,
     #[serde(rename = "sizeBytes")]
     pub size_bytes: usize,
-    pub bytes: Vec<u8>,
+    #[serde(rename = "base64Data")]
+    pub base64_data: String,
 }
 
 const MAX_PREVIEW_BYTES: usize = 10 * 1024 * 1024;
@@ -268,7 +271,7 @@ pub async fn get_binary_preview(
     Ok(BinaryPreview {
         mime_type,
         size_bytes: bytes.len(),
-        bytes,
+        base64_data: BASE64.encode(bytes),
     })
 }
 
