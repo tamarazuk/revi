@@ -1,9 +1,10 @@
 import pc from 'picocolors';
 import { detectRepo, RepoContext } from '../git/detect';
 import { resolveRefs, ResolvedRefs } from '../git/refs';
-import { getChangedFiles } from '../git/diff';
+import { getChangedFiles, getUncommittedFiles } from '../git/diff';
 import { writeManifest } from '../manifest/writer';
 import { launchApp } from '../app/launcher';
+import type { ComparisonMode, FileEntry } from '@revi/shared';
 
 export interface ReviewOptions {
   base?: string;
@@ -61,18 +62,40 @@ export async function review(path: string, options: ReviewOptions): Promise<void
     `${refs.base.ref} (${refs.base.sha.slice(0, 7)}) → ${refs.head.ref} (${refs.head.sha.slice(0, 7)})`
   );
 
-  // Check for empty diff
-  if (refs.base.sha === refs.head.sha) {
-    console.log(pc.yellow('\nWarning:'), 'Base and head are the same commit. No changes to review.');
-    console.log(pc.dim('  Try specifying a different --base ref.'));
-    return;
+  let files: FileEntry[];
+  let manifestBase = refs.base;
+  let manifestHead = refs.head;
+  let comparisonMode: ComparisonMode | undefined;
+
+  const shouldUseUncommitted = options.worktree || (!options.base && refs.base.sha === refs.head.sha);
+
+  if (shouldUseUncommitted) {
+    files = await getUncommittedFiles(repo.root);
+    manifestBase = { ref: refs.head.ref, sha: refs.head.sha };
+    manifestHead = { ref: 'WORKING_TREE', sha: 'WORKING_TREE' };
+    comparisonMode = { type: 'uncommitted' };
+
+    console.log(
+      pc.dim('Comparing:'),
+      `${manifestBase.ref} (${manifestBase.sha.slice(0, 7)}) → ${manifestHead.ref}`
+    );
+  } else {
+    // Explicit commit-to-commit mode
+    if (refs.base.sha === refs.head.sha) {
+      console.log(pc.yellow('\nWarning:'), 'Base and head are the same commit. No changes to review.');
+      console.log(pc.dim('  Try specifying a different --base ref or use --worktree.'));
+      return;
+    }
+
+    files = await getChangedFiles(repo.root, refs.base.sha, refs.head.sha);
   }
 
-  // Step 3: Get changed files
-  const files = await getChangedFiles(repo.root, refs.base.sha, refs.head.sha);
-
   if (files.length === 0) {
-    console.log(pc.yellow('\nNo files changed between these refs.'));
+    if (comparisonMode?.type === 'uncommitted') {
+      console.log(pc.yellow('\nNo uncommitted changes to review.'));
+    } else {
+      console.log(pc.yellow('\nNo files changed between these refs.'));
+    }
     return;
   }
 
@@ -88,10 +111,11 @@ export async function review(path: string, options: ReviewOptions): Promise<void
   // Step 4: Write manifest
   const sessionPath = await writeManifest({
     repoRoot: repo.root,
-    base: refs.base,
-    head: refs.head,
+    base: manifestBase,
+    head: manifestHead,
     worktree: repo.worktree,
     files,
+    comparisonMode,
   });
   console.log(pc.dim('\nSession:'), sessionPath);
 

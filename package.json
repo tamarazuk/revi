@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @revi/desktop tauri dev",
+    "desktop:install": "pnpm --filter @revi/desktop tauri:build:install",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

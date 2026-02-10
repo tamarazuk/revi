@@ -70,6 +70,9 @@ export const KEYBINDINGS: Keybinding[] = [
   { id: 'new_window', group: 'Window', label: 'New window', scope: 'manager', combos: [
     { key: 'n', displayKeys: ['⌘', 'N'], mod: true },
   ] },
+  { id: 'close_window', group: 'Window', label: 'Close window', scope: 'manager', combos: [
+    { key: 'w', displayKeys: ['⌘', 'W'], mod: true },
+  ] },
   { id: 'zoom_in', group: 'Window', label: 'Zoom in', scope: 'manager', combos: [
     { key: '=', displayKeys: ['⌘', '+'], mod: true, caseSensitive: true },
     { key: '+', displayKeys: ['⌘', '+'], mod: true, shift: true, caseSensitive: true },

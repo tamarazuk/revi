@@ -46,6 +46,8 @@ export function App() {
           const sessionPath = await invoke<string | null>('get_session_arg');
           if (sessionPath) {
             await loadSession(sessionPath);
+            await currentWindow.show();
+            await currentWindow.setFocus();
             setInitComplete(true);
             return;
           }

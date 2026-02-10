@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { nanoid } from 'nanoid';
-import type { ReviewManifest, RefInfo, WorktreeInfo, FileEntry } from '@revi/shared';
+import type { ReviewManifest, RefInfo, WorktreeInfo, FileEntry, ComparisonMode } from '@revi/shared';
 
 export interface ManifestInput {
   repoRoot: string;
@@ -9,6 +9,7 @@ export interface ManifestInput {
   head: RefInfo;
   worktree?: WorktreeInfo;
   files: FileEntry[];
+  comparisonMode?: ComparisonMode;
 }
 
 export async function writeManifest(input: ManifestInput): Promise<string> {
@@ -23,6 +24,7 @@ export async function writeManifest(input: ManifestInput): Promise<string> {
     worktree: input.worktree,
     files: input.files,
     createdAt: new Date().toISOString(),
+    comparisonMode: input.comparisonMode,
   };
 
   // Ensure .revi/sessions directory exists

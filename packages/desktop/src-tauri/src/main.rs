@@ -71,7 +71,12 @@ fn main() {
                 }
             });
 
-            window::restore_windows(app.handle());
+            // If launched with an explicit session path (CLI), prioritize a single
+            // focused window for that session and skip restoring prior window set.
+            let has_session_arg = session::get_session_arg().is_some();
+            if !has_session_arg {
+                window::restore_windows(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

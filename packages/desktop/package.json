@@ -12,7 +12,9 @@
     "clean": "rm -rf dist",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "install:macos": "bash ./scripts/install-macos-app.sh",
+    "tauri:build:install": "tauri build && bash ./scripts/install-macos-app.sh"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

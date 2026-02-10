@@ -128,6 +128,11 @@ export function useKeyboardManager() {
             invoke('create_window');
             return;
           }
+          case 'close_window': {
+            const webview = getCurrentWebviewWindow();
+            webview.close();
+            return;
+          }
           case 'open_in_editor': {
             if (selectedFile && session) {
               const fullPath = `${session.repoRoot}/${selectedFile}`;
