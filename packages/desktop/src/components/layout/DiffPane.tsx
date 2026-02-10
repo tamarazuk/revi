@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ArrowsInIcon, ArrowsOutIcon, CodeBlockIcon, CopyIcon } from '@phosphor-icons/react';
 import { useSessionStore } from '../../stores/session';
@@ -13,6 +13,11 @@ export function DiffPane() {
   const { diffMode } = useUIStore();
   const { getCollapseState, setHunkCollapsed, setFileCollapsed } = useReviewStateStore();
   const { diff, isLoading, error } = useDiff({ filePath: selectedFile });
+  const [previewMode, setPreviewMode] = useState<'diff' | 'preview'>('diff');
+
+  useEffect(() => {
+    setPreviewMode('diff');
+  }, [selectedFile]);
 
   const collapseState = selectedFile ? getCollapseState(selectedFile) : null;
   const isFileCollapsedState = collapseState?.file ?? false;
@@ -74,17 +79,33 @@ export function DiffPane() {
     );
   }
 
+  const extension = file.path.split('.').pop()?.toLowerCase() ?? '';
+  const supportsDualModePreview = !file.binary && extension === 'svg';
+  const showPreview = file.binary || (supportsDualModePreview && previewMode === 'preview');
+
   // Handle binary files
-  if (file.binary) {
+  if (showPreview) {
     return (
       <main className="diff-pane">
-        <DiffHeader file={file} repoRoot={session.repoRoot} isCollapsed={isFileCollapsedState} onToggleCollapse={onToggleFileCollapse} hunkCount={0} />
+        <DiffHeader
+          file={file}
+          repoRoot={session.repoRoot}
+          isCollapsed={isFileCollapsedState}
+          onToggleCollapse={onToggleFileCollapse}
+          hunkCount={0}
+          supportsDualModePreview={supportsDualModePreview}
+          previewMode={previewMode}
+          onTogglePreviewMode={() => setPreviewMode(previewMode === 'preview' ? 'diff' : 'preview')}
+        />
         {!isFileCollapsedState && (
           <div className="diff-pane__content diff-pane__content--centered">
-            <div className="binary-message">
-              <p>Binary file</p>
-              <p className="dim">{file.path}</p>
-            </div>
+            <BinaryPreview
+              repoRoot={session.repoRoot}
+              baseSha={session.base.sha}
+              headSha={session.head.sha}
+              diffMode={diffMode}
+              file={file}
+            />
           </div>
         )}
       </main>
@@ -93,7 +114,18 @@ export function DiffPane() {
 
   return (
     <main className="diff-pane">
-      <DiffHeader file={file} repoRoot={session.repoRoot} isCollapsed={isFileCollapsedState} onToggleCollapse={onToggleFileCollapse} hunkCount={hunkCount} onCollapseAllHunks={onCollapseAllHunks} onExpandAllHunks={onExpandAllHunks} />
+      <DiffHeader
+        file={file}
+        repoRoot={session.repoRoot}
+        isCollapsed={isFileCollapsedState}
+        onToggleCollapse={onToggleFileCollapse}
+        hunkCount={hunkCount}
+        onCollapseAllHunks={onCollapseAllHunks}
+        onExpandAllHunks={onExpandAllHunks}
+        supportsDualModePreview={supportsDualModePreview}
+        previewMode={previewMode}
+        onTogglePreviewMode={() => setPreviewMode(previewMode === 'preview' ? 'diff' : 'preview')}
+      />
       {!isFileCollapsedState && (
         <div className="diff-pane__content">
         {isLoading && !diff && (
@@ -148,6 +180,232 @@ export function DiffPane() {
   );
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+interface BinaryPreviewProps {
+  repoRoot: string;
+  baseSha: string;
+  headSha: string;
+  diffMode: 'split' | 'unified';
+  file: {
+    path: string;
+    status: string;
+    binary: boolean;
+  };
+}
+
+interface BinaryPreviewPayload {
+  mimeType: string;
+  sizeBytes: number;
+  bytes: number[];
+}
+
+interface BinaryAsset {
+  url: string;
+  mimeType: string;
+  sizeBytes: number;
+  dimensions: { width: number; height: number } | null;
+}
+
+function BinaryPreview({ repoRoot, baseSha, headSha, diffMode, file }: BinaryPreviewProps) {
+  const [currentAsset, setCurrentAsset] = useState<BinaryAsset | null>(null);
+  const [previousAsset, setPreviousAsset] = useState<BinaryAsset | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const extension = file.path.split('.').pop()?.toLowerCase() ?? 'unknown';
+  const isModified = file.status === 'modified' || file.status === 'renamed';
+
+  useEffect(() => {
+    const objectUrls: string[] = [];
+    let active = true;
+
+    setCurrentAsset(null);
+    setPreviousAsset(null);
+    setError(null);
+
+    const invokePreview = (statusOverride?: string) => {
+      return invoke<BinaryPreviewPayload>('get_binary_preview', {
+        repoRoot,
+        baseSha,
+        headSha,
+        filePath: file.path,
+        fileStatus: statusOverride ?? file.status,
+      });
+    };
+
+    const payloadToAsset = async (payload: BinaryPreviewPayload): Promise<BinaryAsset> => {
+      const uint8 = new Uint8Array(payload.bytes);
+      const blob = new Blob([uint8], { type: payload.mimeType });
+      const url = URL.createObjectURL(blob);
+      objectUrls.push(url);
+
+      let dimensions: { width: number; height: number } | null = null;
+      if (payload.mimeType.startsWith('image/')) {
+        const image = new Image();
+        dimensions = await new Promise((resolve, reject) => {
+          image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+          image.onerror = () => reject(new Error('Failed to decode image'));
+          image.src = url;
+        });
+      }
+
+      return {
+        url,
+        mimeType: payload.mimeType,
+        sizeBytes: payload.sizeBytes,
+        dimensions,
+      };
+    };
+
+    const loadPreview = async () => {
+      setIsLoading(true);
+      try {
+        const currentPayload = await invokePreview();
+        if (!active) return;
+
+        const current = await payloadToAsset(currentPayload);
+        if (!active) return;
+        setCurrentAsset(current);
+
+        if (
+          isModified &&
+          (currentPayload.mimeType.startsWith('image/') || currentPayload.mimeType === 'application/pdf')
+        ) {
+          try {
+            const previousPayload = await invokePreview('deleted');
+            if (!active) return;
+
+            if (previousPayload.mimeType === currentPayload.mimeType) {
+              const previous = await payloadToAsset(previousPayload);
+              if (!active) return;
+              setPreviousAsset(previous);
+            }
+          } catch {
+            // If "before" preview can't be loaded, keep "after" preview.
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Preview unavailable for this file state.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadPreview();
+
+    return () => {
+      active = false;
+      for (const url of objectUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [repoRoot, baseSha, headSha, file.path, file.status, isModified]);
+
+  const currentMimeType = currentAsset?.mimeType ?? null;
+  const isComparableMime =
+    currentMimeType?.startsWith('image/') || currentMimeType === 'application/pdf';
+  const showComparison = isModified && Boolean(currentAsset && previousAsset && isComparableMime);
+
+  const statusLabel = file.status === 'deleted'
+    ? 'Deleted'
+    : file.status === 'added'
+      ? 'Added'
+      : file.status === 'modified'
+        ? 'Modified'
+        : file.status === 'renamed'
+          ? 'Renamed'
+          : file.status;
+
+  const renderAsset = (asset: BinaryAsset, toneClass: string) => {
+    if (asset.mimeType.startsWith('image/')) {
+      return (
+        <img
+          className={`binary-preview__image ${toneClass}`}
+          src={asset.url}
+          alt={`Preview of ${file.path}`}
+        />
+      );
+    }
+
+    if (asset.mimeType === 'application/pdf') {
+      return (
+        <iframe
+          className={`binary-preview__pdf ${toneClass}`}
+          src={asset.url}
+          title={`Preview of ${file.path}`}
+        />
+      );
+    }
+
+    return <p className="dim">Preview not supported for {asset.mimeType}.</p>;
+  };
+
+  const assetMeta = (asset: BinaryAsset) => {
+    const parts: string[] = [];
+    if (asset.dimensions) {
+      parts.push(`${asset.dimensions.width}x${asset.dimensions.height}`);
+    }
+    parts.push(formatBytes(asset.sizeBytes));
+    return parts.join(' · ');
+  };
+
+  return (
+    <div className="binary-preview">
+      <div className="binary-preview__meta">
+        <strong>{currentMimeType === 'application/pdf' ? 'PDF preview' : 'Binary preview'}</strong>
+        <span className="dim">
+          {extension.toUpperCase()}
+          {currentAsset?.dimensions ? ` · ${currentAsset.dimensions.width}x${currentAsset.dimensions.height}` : ''}
+          {currentAsset ? ` · ${formatBytes(currentAsset.sizeBytes)}` : ''}
+        </span>
+        <span className={`binary-preview__status binary-preview__status--${file.status}`}>{statusLabel}</span>
+      </div>
+
+      {isLoading && (
+        <div className="binary-preview__loading">
+          <span className="diff-loading__spinner" />
+          <span className="dim">Rendering preview...</span>
+        </div>
+      )}
+      {!isLoading && error && <p className="dim">{error}</p>}
+
+      {!isLoading && !error && showComparison && currentAsset && previousAsset && (
+        <div
+          className={`binary-preview__compare ${
+            diffMode === 'unified' ? 'binary-preview__compare--stacked' : ''
+          }`}
+        >
+          <div className="binary-preview__compare-item">
+            <div className="binary-preview__compare-label">Before</div>
+            <div className="binary-preview__compare-meta dim">{assetMeta(previousAsset)}</div>
+            {renderAsset(previousAsset, 'binary-preview__image--before')}
+          </div>
+          <div className="binary-preview__compare-item">
+            <div className="binary-preview__compare-label">After</div>
+            <div className="binary-preview__compare-meta dim">{assetMeta(currentAsset)}</div>
+            {renderAsset(currentAsset, 'binary-preview__image--after')}
+          </div>
+        </div>
+      )}
+
+      {!isLoading && !error && !showComparison && currentAsset && (
+        <div className="binary-preview__single">
+          {renderAsset(currentAsset, `binary-preview__image--${file.status}`)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface DiffHeaderProps {
   file: {
     path: string;
@@ -162,9 +420,23 @@ interface DiffHeaderProps {
   hunkCount: number;
   onCollapseAllHunks?: () => void;
   onExpandAllHunks?: () => void;
+  supportsDualModePreview?: boolean;
+  previewMode?: 'diff' | 'preview';
+  onTogglePreviewMode?: () => void;
 }
 
-function DiffHeader({ file, repoRoot, isCollapsed, onToggleCollapse, hunkCount, onCollapseAllHunks, onExpandAllHunks }: DiffHeaderProps) {
+function DiffHeader({
+  file,
+  repoRoot,
+  isCollapsed,
+  onToggleCollapse,
+  hunkCount,
+  onCollapseAllHunks,
+  onExpandAllHunks,
+  supportsDualModePreview = false,
+  previewMode = 'diff',
+  onTogglePreviewMode,
+}: DiffHeaderProps) {
   const handleCopyPath = () => {
     invoke('copy_to_clipboard', { content: file.path }).catch((err) => {
       console.error('Failed to copy to clipboard:', err);
@@ -209,6 +481,15 @@ function DiffHeader({ file, repoRoot, isCollapsed, onToggleCollapse, hunkCount, 
           >
             <CodeBlockIcon size={16} />
           </button>
+          {supportsDualModePreview && onTogglePreviewMode && (
+            <button
+              className="diff-pane__action diff-pane__action--toggle"
+              onClick={onTogglePreviewMode}
+              title={previewMode === 'preview' ? 'Show diff view' : 'Show preview view'}
+            >
+              {previewMode === 'preview' ? 'Diff' : 'Preview'}
+            </button>
+          )}
           {!isCollapsed && hunkCount > 1 && (
             <>
               <span className="diff-pane__actions-divider" aria-hidden="true" />

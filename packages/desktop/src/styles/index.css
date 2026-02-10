@@ -453,6 +453,19 @@ body {
   padding: 0;
 }
 
+.diff-pane__action--toggle {
+  min-width: 62px;
+  height: 24px;
+  padding: 0 0.5rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.diff-pane__action--toggle:hover {
+  border-color: var(--accent-blue);
+}
+
 .diff-pane__action:hover {
   color: var(--text-primary);
   background: var(--bg-tertiary);
@@ -788,8 +801,9 @@ body {
 }
 
 .diff-pane__content--centered {
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: auto;
 }
 
 .diff-pane__path-info {
@@ -815,6 +829,173 @@ body {
   color: var(--text-secondary);
   text-align: center;
   height: 100%;
+}
+
+.binary-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  width: min(100%, 980px);
+  min-height: 100%;
+  padding: 0.5rem 0.75rem;
+  margin: 0 auto;
+}
+
+.binary-preview__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.binary-preview__status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.binary-preview__status--added {
+  border-color: rgba(63, 185, 80, 0.45);
+  color: var(--accent-green);
+}
+
+.binary-preview__status--deleted {
+  border-color: rgba(248, 81, 73, 0.45);
+  color: var(--accent-red);
+}
+
+.binary-preview__status--modified,
+.binary-preview__status--renamed {
+  border-color: rgba(56, 139, 253, 0.45);
+  color: var(--accent-blue);
+}
+
+.binary-preview__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.binary-preview__loading .diff-loading__spinner {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-bottom: 0;
+}
+
+.binary-preview__single {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.binary-preview__compare {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.binary-preview__compare--stacked {
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+.binary-preview__compare-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.binary-preview__compare-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.binary-preview__compare-meta {
+  font-size: 0.72rem;
+  margin-top: -0.15rem;
+}
+
+.binary-preview__image {
+  max-width: 100%;
+  max-height: min(74vh, 760px);
+  object-fit: contain;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.binary-preview__image--before,
+.binary-preview__image--deleted {
+  border-width: 2px;
+  border-color: rgba(248, 81, 73, 0.75);
+  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.2);
+}
+
+.binary-preview__image--after,
+.binary-preview__image--added {
+  border-width: 2px;
+  border-color: rgba(63, 185, 80, 0.75);
+  box-shadow: 0 0 0 1px rgba(63, 185, 80, 0.2);
+}
+
+.binary-preview__image--modified,
+.binary-preview__image--renamed {
+  border-color: rgba(56, 139, 253, 0.55);
+  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.2);
+}
+
+.binary-preview__pdf.binary-preview__image--before,
+.binary-preview__pdf.binary-preview__image--deleted {
+  border-width: 2px;
+  border-color: rgba(248, 81, 73, 0.75);
+  box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.2);
+}
+
+.binary-preview__pdf.binary-preview__image--after,
+.binary-preview__pdf.binary-preview__image--added {
+  border-width: 2px;
+  border-color: rgba(63, 185, 80, 0.75);
+  box-shadow: 0 0 0 1px rgba(63, 185, 80, 0.2);
+}
+
+.binary-preview__pdf.binary-preview__image--modified,
+.binary-preview__pdf.binary-preview__image--renamed {
+  border-width: 2px;
+  border-color: rgba(56, 139, 253, 0.75);
+  box-shadow: 0 0 0 1px rgba(56, 139, 253, 0.2);
+}
+
+.binary-preview__pdf {
+  width: 100%;
+  max-width: 900px;
+  height: min(70vh, 760px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.binary-preview__compare .binary-preview__pdf {
+  height: min(58vh, 620px);
+}
+
+@media (max-width: 900px) {
+  .binary-preview__compare {
+    grid-template-columns: 1fr;
+  }
 }
 
 .diff-loading__spinner {

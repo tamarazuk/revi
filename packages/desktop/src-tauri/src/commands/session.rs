@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::process::Command;
 use tauri::{AppHandle, Manager};
@@ -557,6 +558,22 @@ fn parse_name_status(output: &str) -> std::collections::HashMap<String, String> 
     map
 }
 
+fn is_binary_file(path: &Path) -> bool {
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(_) => return false,
+    };
+
+    let mut buffer = [0u8; 8192];
+    let read_count = match file.read(&mut buffer) {
+        Ok(count) => count,
+        Err(_) => return false,
+    };
+
+    let sample = &buffer[..read_count];
+    sample.contains(&0) || std::str::from_utf8(sample).is_err()
+}
+
 /// Get list of uncommitted files (staged + unstaged + untracked)
 fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
     // Get diff stats for tracked files (both staged and unstaged) against HEAD
@@ -630,6 +647,7 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
 
         // Count lines in untracked file for additions count
         let file_path = Path::new(repo_root).join(line);
+        let binary = is_binary_file(&file_path);
         let additions = if let Ok(content) = fs::read_to_string(&file_path) {
             content.lines().count() as u32
         } else {
@@ -642,7 +660,7 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
             additions,
             deletions: 0,
             renamed_from: None,
-            binary: false,
+            binary,
         });
     }
 

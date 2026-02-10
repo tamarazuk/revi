@@ -1,6 +1,9 @@
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_shell::ShellExt;
+use serde::Serialize;
+use std::fs;
+use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // Editor command template parsing (task 9a)
@@ -170,6 +173,104 @@ fn build_heuristic_args(
 // ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct BinaryPreview {
+    #[serde(rename = "mimeType")]
+    pub mime_type: String,
+    #[serde(rename = "sizeBytes")]
+    pub size_bytes: usize,
+    pub bytes: Vec<u8>,
+}
+
+const MAX_PREVIEW_BYTES: usize = 10 * 1024 * 1024;
+
+fn detect_mime_type(file_path: &str) -> Option<&'static str> {
+    let ext = Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())?;
+
+    match ext.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "bmp" => Some("image/bmp"),
+        "svg" => Some("image/svg+xml"),
+        "ico" => Some("image/x-icon"),
+        "pdf" => Some("application/pdf"),
+        _ => None,
+    }
+}
+
+fn read_file_from_working_tree(repo_root: &str, file_path: &str) -> Result<Vec<u8>, String> {
+    let root = Path::new(repo_root)
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve repository root: {}", e))?;
+    let full_path = root.join(file_path);
+
+    let canon = full_path
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve file path: {}", e))?;
+
+    if !canon.starts_with(&root) {
+        return Err("Path escapes repository root".to_string());
+    }
+
+    fs::read(canon).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+fn read_file_from_git_ref(repo_root: &str, git_ref: &str, file_path: &str) -> Result<Vec<u8>, String> {
+    let spec = format!("{}:{}", git_ref, file_path);
+    let output = std::process::Command::new("git")
+        .args(["show", &spec])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|e| format!("Failed to read file from git: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("File not available at ref: {}", stderr.trim()));
+    }
+
+    Ok(output.stdout)
+}
+
+#[tauri::command]
+pub async fn get_binary_preview(
+    repo_root: String,
+    base_sha: String,
+    head_sha: String,
+    file_path: String,
+    file_status: String,
+) -> Result<BinaryPreview, String> {
+    let mime_type = detect_mime_type(&file_path)
+        .ok_or_else(|| "Preview not supported for this file type".to_string())?
+        .to_string();
+
+    let bytes = if head_sha == "WORKING_TREE" {
+        if file_status == "deleted" {
+            read_file_from_git_ref(&repo_root, &base_sha, &file_path)?
+        } else {
+            read_file_from_working_tree(&repo_root, &file_path)?
+        }
+    } else if file_status == "deleted" {
+        read_file_from_git_ref(&repo_root, &base_sha, &file_path)?
+    } else {
+        read_file_from_git_ref(&repo_root, &head_sha, &file_path)?
+    };
+
+    if bytes.len() > MAX_PREVIEW_BYTES {
+        return Err("Preview disabled for files larger than 10 MB".to_string());
+    }
+
+    Ok(BinaryPreview {
+        mime_type,
+        size_bytes: bytes.len(),
+        bytes,
+    })
+}
 
 /// Open a file in the user's editor.
 ///

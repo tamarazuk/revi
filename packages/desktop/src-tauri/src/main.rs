@@ -42,6 +42,7 @@ fn main() {
             window::focus_window_and_close,
             file_ops::open_in_editor,
             file_ops::copy_to_clipboard,
+            file_ops::get_binary_preview,
             watcher::start_watching,
             watcher::stop_watching,
         ])
