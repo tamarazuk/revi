@@ -7,11 +7,13 @@ import { SplitDiffLine } from './SplitDiffLine';
 import { ContextMenu, useContextMenu } from '../ui/ContextMenu';
 import { useDiffNavigation } from '../../hooks/useDiffNavigation';
 import { useKeyboardStore } from '../../stores/keyboard';
+import { useReviewStateStore } from '../../stores/reviewState';
 
 interface SplitViewProps {
   diff: FileDiff;
   repoRoot: string;
   filePath: string;
+  restoreKey: string;
   isNewFile: boolean;
   collapsedHunks: Set<number>;
   onToggleHunk: (hunkIndex: number) => void;
@@ -31,6 +33,7 @@ export function SplitView({
   diff,
   repoRoot,
   filePath,
+  restoreKey,
   isNewFile,
   collapsedHunks,
   onToggleHunk,
@@ -38,6 +41,8 @@ export function SplitView({
   const parentRef = useRef<HTMLDivElement>(null);
   const closeMenuTimerRef = useRef<number | null>(null);
   const activeHunkIndex = useKeyboardStore((s) => s.activeHunkIndex);
+  const setScrollPosition = useReviewStateStore((s) => s.setScrollPosition);
+  const getScrollPosition = useReviewStateStore((s) => s.getScrollPosition);
   const { menuState, openMenu, closeMenu } = useContextMenu();
   const [contextTarget, setContextTarget] = useState<{
     line: DiffLineType;
@@ -52,6 +57,52 @@ export function SplitView({
       }
     };
   }, []);
+
+  useEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+
+    const savedScrollTop = getScrollPosition(filePath);
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTop = savedScrollTop;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [filePath, restoreKey, getScrollPosition]);
+
+  useEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+
+    let saveTimer: number | null = null;
+
+    const saveScroll = () => {
+      setScrollPosition(filePath, element.scrollTop);
+    };
+
+    const handleScroll = () => {
+      if (saveTimer !== null) {
+        window.clearTimeout(saveTimer);
+      }
+
+      saveTimer = window.setTimeout(() => {
+        saveScroll();
+        saveTimer = null;
+      }, 120);
+    };
+
+    element.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      if (saveTimer !== null) {
+        window.clearTimeout(saveTimer);
+      }
+      saveScroll();
+      element.removeEventListener('scroll', handleScroll);
+    };
+  }, [filePath, setScrollPosition]);
 
   // Convert hunks into paired rows for side-by-side display
   const rows = useMemo(() => {

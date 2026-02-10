@@ -7,11 +7,13 @@ import { HunkHeader } from './HunkHeader';
 import { ContextMenu, useContextMenu } from '../ui/ContextMenu';
 import { useDiffNavigation } from '../../hooks/useDiffNavigation';
 import { useKeyboardStore } from '../../stores/keyboard';
+import { useReviewStateStore } from '../../stores/reviewState';
 
 interface UnifiedViewProps {
   diff: FileDiff;
   repoRoot: string;
   filePath: string;
+  restoreKey: string;
   collapsedHunks: Set<number>;
   onToggleHunk: (hunkIndex: number) => void;
 }
@@ -21,10 +23,19 @@ type VirtualRow =
   | { type: 'hunk-header'; hunk: Hunk; hunkIndex: number }
   | { type: 'line'; line: DiffLineType; hunkIndex: number; lineIndex: number };
 
-export function UnifiedView({ diff, repoRoot, filePath, collapsedHunks, onToggleHunk }: UnifiedViewProps) {
+export function UnifiedView({
+  diff,
+  repoRoot,
+  filePath,
+  restoreKey,
+  collapsedHunks,
+  onToggleHunk,
+}: UnifiedViewProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const closeMenuTimerRef = useRef<number | null>(null);
   const activeHunkIndex = useKeyboardStore((s) => s.activeHunkIndex);
+  const setScrollPosition = useReviewStateStore((s) => s.setScrollPosition);
+  const getScrollPosition = useReviewStateStore((s) => s.getScrollPosition);
   const { menuState, openMenu, closeMenu } = useContextMenu();
   const [contextTarget, setContextTarget] = useState<{
     line: DiffLineType;
@@ -39,6 +50,52 @@ export function UnifiedView({ diff, repoRoot, filePath, collapsedHunks, onToggle
       }
     };
   }, []);
+
+  useEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+
+    const savedScrollTop = getScrollPosition(filePath);
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTop = savedScrollTop;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [filePath, restoreKey, getScrollPosition]);
+
+  useEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+
+    let saveTimer: number | null = null;
+
+    const saveScroll = () => {
+      setScrollPosition(filePath, element.scrollTop);
+    };
+
+    const handleScroll = () => {
+      if (saveTimer !== null) {
+        window.clearTimeout(saveTimer);
+      }
+
+      saveTimer = window.setTimeout(() => {
+        saveScroll();
+        saveTimer = null;
+      }, 120);
+    };
+
+    element.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      if (saveTimer !== null) {
+        window.clearTimeout(saveTimer);
+      }
+      saveScroll();
+      element.removeEventListener('scroll', handleScroll);
+    };
+  }, [filePath, setScrollPosition]);
 
   // Flatten hunks and lines into a single array of virtual rows
   const rows = useMemo(() => {
@@ -97,7 +154,8 @@ export function UnifiedView({ diff, repoRoot, filePath, collapsedHunks, onToggle
 
   const handleCopyLine = () => {
     if (!contextTarget) return;
-    const prefix = contextTarget.line.type === 'added' ? '+' : contextTarget.line.type === 'deleted' ? '-' : ' ';
+    const prefix =
+      contextTarget.line.type === 'added' ? '+' : contextTarget.line.type === 'deleted' ? '-' : ' ';
     invoke('copy_to_clipboard', { content: `${prefix}${contextTarget.line.content}` })
       .then(() => {
         showCopiedFeedback('line');
@@ -203,12 +261,7 @@ export function UnifiedView({ diff, repoRoot, filePath, collapsedHunks, onToggle
         </div>
       </div>
       {menuState.isOpen && contextTarget && (
-        <ContextMenu
-          x={menuState.x}
-          y={menuState.y}
-          onClose={closeMenu}
-          items={contextMenuItems}
-        />
+        <ContextMenu x={menuState.x} y={menuState.y} onClose={closeMenu} items={contextMenuItems} />
       )}
     </>
   );
