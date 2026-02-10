@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react';
+import { SidebarSimple as SidebarSimpleIcon } from '@phosphor-icons/react';
 import { useSessionStore } from '../../stores/session';
 import { useUIStore } from '../../stores/ui';
 import { useSidebarStore, expandAllDirs } from '../../stores/sidebar';
@@ -10,7 +11,7 @@ import type { FileEntry } from '@revi/shared';
 
 export function Sidebar() {
   const { session, selectedFile, selectFile } = useSessionStore();
-  const { sidebarVisible, sidebarWidth } = useUIStore();
+  const { sidebarVisible, sidebarWidth, toggleSidebar } = useUIStore();
   const { filter } = useSidebarStore();
   const { isViewed } = useReviewStateStore();
 
@@ -66,7 +67,22 @@ export function Sidebar() {
     }
   }, [allDirs]);
 
-  if (!session || !sidebarVisible) return null;
+  if (!session) return null;
+
+  // When sidebar is hidden, show a narrow strip with a reopen button
+  if (!sidebarVisible) {
+    return (
+      <aside className="sidebar sidebar--collapsed">
+        <button
+          className="sidebar__reopen"
+          onClick={toggleSidebar}
+          title="Show sidebar (b)"
+        >
+          <SidebarSimpleIcon size={18} />
+        </button>
+      </aside>
+    );
+  }
 
   const hasActiveFilters =
     filter.status.length > 0 || filter.searchQuery !== '' || filter.viewedState !== 'all';
@@ -75,11 +91,20 @@ export function Sidebar() {
     <aside className="sidebar" style={{ width: sidebarWidth }}>
       <div className="sidebar__header">
         <span className="sidebar__title">Files changed</span>
-        <span className="sidebar__count">
-          {hasActiveFilters
-            ? `${filteredFiles.length}/${session.files.length}`
-            : session.files.length}
-        </span>
+        <div className="sidebar__header-actions">
+          <span className="sidebar__count">
+            {hasActiveFilters
+              ? `${filteredFiles.length}/${session.files.length}`
+              : session.files.length}
+          </span>
+          <button
+            className="sidebar__toggle"
+            onClick={toggleSidebar}
+            title="Hide sidebar (b)"
+          >
+            <SidebarSimpleIcon size={16} />
+          </button>
+        </div>
       </div>
 
       <FileFilter />

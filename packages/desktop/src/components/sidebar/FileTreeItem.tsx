@@ -15,6 +15,7 @@ interface FileTreeItemProps {
 export function FileTreeItem({ file, repoRoot, isSelected, isFocused, onSelect }: FileTreeItemProps) {
   const fileName = file.path.split('/').pop() || file.path;
   const isViewed = useReviewStateStore((state) => state.isViewed(file.path));
+  const recoveryInfo = useReviewStateStore((state) => state.getRecoveryInfo(file.path));
   const { toggleViewed, files: reviewFiles } = useReviewStateStore();
   const { menuState, openMenu, closeMenu } = useContextMenu();
 
@@ -75,6 +76,9 @@ export function FileTreeItem({ file, repoRoot, isSelected, isFocused, onSelect }
           title={isViewed ? 'Mark as unviewed' : 'Mark as viewed'}
         >
           {isViewed ? '\u2713' : '\u25cb'}
+          {recoveryInfo?.changedSinceViewed && (
+            <span className="file-tree-item__changed-dot" title="Changed since you last viewed" />
+          )}
         </span>
         <span className="file-tree-item__status">
           {getStatusIndicator(file.status)}
@@ -82,7 +86,12 @@ export function FileTreeItem({ file, repoRoot, isSelected, isFocused, onSelect }
         <span className="file-tree-item__name" title={file.path}>
           {fileName}
         </span>
-        <span className="file-tree-item__stats">
+        <span
+          className="file-tree-item__stats"
+          title={recoveryInfo?.changedSinceViewed
+            ? `was +${recoveryInfo.oldStats.additions}/-${recoveryInfo.oldStats.deletions}, now +${recoveryInfo.newStats.additions}/-${recoveryInfo.newStats.deletions}`
+            : undefined}
+        >
           <span className="addition">+{file.additions}</span>
           <span className="deletion">-{file.deletions}</span>
         </span>

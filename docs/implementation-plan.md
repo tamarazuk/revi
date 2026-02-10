@@ -59,13 +59,13 @@ revi/
 
 ### Tasks
 
-- [ ] Initialize pnpm workspace
-- [ ] Create `packages/shared` with TypeScript types
-- [ ] Create `packages/cli` with Commander.js setup
-- [ ] Create `packages/desktop` with Tauri + React (Vite)
-- [ ] Configure Turborepo for build orchestration
+- [x] Initialize pnpm workspace
+- [x] Create `packages/shared` with TypeScript types
+- [x] Create `packages/cli` with Commander.js setup
+- [x] Create `packages/desktop` with Tauri + React (Vite)
+- [x] Configure Turborepo for build orchestration
 - [ ] Set up ESLint, Prettier, TypeScript configs
-- [ ] Add development scripts (`pnpm dev`, `pnpm build`)
+- [x] Add development scripts (`pnpm dev`, `pnpm build`)
 
 ### Key Dependencies
 
@@ -133,15 +133,15 @@ packages/cli/src/
 
 ### Tasks
 
-- [ ] Implement repo root detection (`git rev-parse --show-toplevel`)
-- [ ] Implement worktree detection (`git worktree list`)
-- [ ] Implement merge-base detection for default base ref
-- [ ] Implement ref resolution (branch name → SHA)
-- [ ] Implement changed file list with stats (`git diff --stat --numstat`)
-- [ ] Generate session ID (nanoid)
-- [ ] Write manifest to `.revi/sessions/<session-id>.json`
-- [ ] Scaffold `.revi/` directory on first run
-- [ ] Offer to add `.revi/` to `.gitignore`
+- [x] Implement repo root detection (`git rev-parse --show-toplevel`)
+- [x] Implement worktree detection (`git worktree list`)
+- [x] Implement merge-base detection for default base ref
+- [x] Implement ref resolution (branch name → SHA)
+- [x] Implement changed file list with stats (`git diff --stat --numstat`)
+- [x] Generate session ID (nanoid)
+- [x] Write manifest to `.revi/sessions/<session-id>.json`
+- [x] Scaffold `.revi/` directory on first run
+- [x] Offer to add `.revi/` to `.gitignore`
 - [ ] Implement app launcher (spawn Tauri app or signal via IPC)
 
 ### CLI Interface
@@ -232,15 +232,15 @@ fn read_config(repo_root: String) -> Result<Config, String>;
 
 ### Tasks
 
-- [ ] Set up Tauri window configuration (size, title, resizable)
-- [ ] Create basic three-pane layout (CSS Grid or Flexbox)
-- [ ] Implement session loading from manifest path (CLI arg or IPC)
-- [ ] Create Zustand store for session state
-- [ ] Create Zustand store for UI state (sidebar width, diff mode)
-- [ ] Render TopBar with session info (base..head, repo path)
-- [ ] Render Sidebar placeholder (file list from manifest)
-- [ ] Render DiffPane placeholder
-- [ ] Implement resizable sidebar (drag handle)
+- [x] Set up Tauri window configuration (size, title, resizable)
+- [x] Create basic three-pane layout (CSS Grid or Flexbox)
+- [x] Implement session loading from manifest path (CLI arg or IPC)
+- [x] Create Zustand store for session state
+- [x] Create Zustand store for UI state (sidebar width, diff mode)
+- [x] Render TopBar with session info (base..head, repo path)
+- [x] Render Sidebar placeholder (file list from manifest)
+- [x] Render DiffPane placeholder
+- [x] Implement resizable sidebar (drag handle)
 
 ### IPC Protocol
 
@@ -286,13 +286,13 @@ fn pick_folder() -> Result<Option<String>, String>;
 
 #### Tasks
 
-- [ ] Add "Open Repository" button in empty state
-- [ ] Implement folder picker using Tauri dialog API
-- [ ] Validate selected folder is a git repository
-- [ ] Create session manifest from selected repo (reuse CLI logic in Rust)
-- [ ] Auto-detect base ref (merge-base with main/master)
-- [ ] Load the created session
-- [ ] (Optional) Store recent repositories for quick access
+- [x] Add "Open Repository" button in empty state
+- [x] Implement folder picker using Tauri dialog API
+- [x] Validate selected folder is a git repository
+- [x] Create session manifest from selected repo (reuse CLI logic in Rust)
+- [x] Auto-detect base ref (merge-base with main/master)
+- [x] Load the created session
+- [x] (Optional) Store recent repositories for quick access
 - [ ] (Optional) Show recent projects list on welcome screen
 
 #### UX Flow
@@ -431,14 +431,14 @@ Include parsers for common languages:
 
 ### Tasks
 
-- [ ] Implement `get_file_diff` command (shell to `git diff`)
-- [ ] Parse unified diff format into structured `FileDiff`
-- [ ] Implement SHA-256 hashing of diff content
-- [ ] Set up Tree-sitter with language parsers
-- [ ] Implement `highlight_code` command
-- [ ] Implement language detection from file extension
-- [ ] Pre-compute highlights for diff lines in Rust
-- [ ] Add caching layer for computed diffs (LRU cache)
+- [x] Implement `get_file_diff` command (shell to `git diff`)
+- [x] Parse unified diff format into structured `FileDiff`
+- [x] Implement SHA-256 hashing of diff content
+- [x] Set up Tree-sitter with language parsers
+- [x] Implement `highlight_code` command
+- [x] Implement language detection from file extension
+- [x] Pre-compute highlights for diff lines in Rust
+- [x] Add caching layer for computed diffs (LRU cache)
 
 ### Deliverable
 React can call Tauri commands to fetch highlighted, structured diffs.
@@ -479,17 +479,17 @@ interface SidebarState {
 
 ### Tasks
 
-- [ ] Group files by directory path
-- [ ] Render file tree with indentation
-- [ ] Implement collapsible directories
-- [ ] Add status badges (A = green, M = yellow, D = red, R = blue)
-- [ ] Add diff stats component with proportion bar
-- [ ] Implement file selection (click and keyboard)
-- [ ] Add `j`/`k` navigation
-- [ ] Add `Enter` to open file
-- [ ] Implement filter by status type
-- [ ] Implement filter by viewed state
-- [ ] Add search/filter input
+- [x] Group files by directory path
+- [x] Render file tree with indentation
+- [x] Implement collapsible directories
+- [x] Add status badges (A = green, M = yellow, D = red, R = blue)
+- [x] Add diff stats component with proportion bar
+- [x] Implement file selection (click and keyboard)
+- [x] Add `j`/`k` navigation
+- [x] Add `Enter` to open file
+- [x] Implement filter by status type
+- [x] Implement filter by viewed state
+- [x] Add search/filter input
 
 ### Visual Design
 
@@ -567,20 +567,20 @@ interface VirtualRow {
 
 ### Tasks
 
-- [ ] Create `VirtualizedDiff` with react-virtual
-- [ ] Implement row height estimation for variable heights
-- [ ] Build `SplitView` with synchronized scrolling
-- [ ] Build `UnifiedView` with single column
-- [ ] Render `HunkHeader` with context info
-- [ ] Render `DiffLine` with line type styling
-- [ ] Apply syntax highlighting from Tree-sitter spans
-- [ ] Implement line number gutters (both sides for split)
+- [x] Create `VirtualizedDiff` with react-virtual
+- [x] Implement row height estimation for variable heights
+- [x] Build `SplitView` with synchronized scrolling
+- [x] Build `UnifiedView` with single column
+- [x] Render `HunkHeader` with context info
+- [x] Render `DiffLine` with line type styling
+- [x] Apply syntax highlighting from Tree-sitter spans
+- [x] Implement line number gutters (both sides for split)
 - [ ] Add word-level diff highlighting within lines
 - [ ] Handle new files: full-width in split mode
-- [ ] Handle deleted files: show deletion context
-- [ ] Handle renamed files: show old/new path
-- [ ] Handle binary files: show "Binary file changed" message
-- [ ] Implement smooth scrolling to hunk (`n`/`p` navigation)
+- [x] Handle deleted files: show deletion context
+- [x] Handle renamed files: show old/new path
+- [x] Handle binary files: show "Binary file changed" message
+- [x] Implement smooth scrolling to hunk (`n`/`p` navigation)
 
 ### Syntax Highlighting Theme
 
@@ -710,17 +710,17 @@ pub fn recover_state(
 
 ### Tasks
 
-- [ ] Define `PersistedState` schema in shared package
-- [ ] Implement `load_review_state` Tauri command
-- [ ] Implement `save_review_state` Tauri command
+- [x] Define `PersistedState` schema in shared package
+- [x] Implement `load_review_state` Tauri command
+- [x] Implement `save_review_state` Tauri command
 - [ ] Implement `recover_state` logic in Rust
-- [ ] Create Zustand store with persistence middleware
-- [ ] Auto-save state on viewed/collapse/scroll changes (debounced)
-- [ ] Load state on session open
+- [x] Create Zustand store with persistence middleware
+- [x] Auto-save state on viewed/collapse/scroll changes (debounced)
+- [x] Load state on session open
 - [ ] Trigger recovery when SHA mismatch detected
 - [ ] Show "Changed since last view" badge in sidebar
 - [ ] Show diff delta in tooltip ("was +12/-3, now +15/-3")
-- [ ] Track review progress in TopBar ("14/23 files viewed")
+- [x] Track review progress in TopBar ("14/23 files viewed")
 
 ### Deliverable
 State persists across app restarts; fuzzy recovery works after rebase/amend.
@@ -861,14 +861,14 @@ components/
 
 ### Tasks
 
-- [ ] Create keyboard event handler hook
-- [ ] Implement action dispatcher
+- [x] Create keyboard event handler hook
+- [x] Implement action dispatcher
 - [ ] Load custom keybindings from config
 - [ ] Merge custom keybindings with defaults
-- [ ] Implement all default actions
-- [ ] Create keyboard help overlay (`?`)
-- [ ] Handle modifier keys (Cmd, Shift, Ctrl, Alt)
-- [ ] Prevent conflicts with system shortcuts
+- [x] Implement all default actions
+- [x] Create keyboard help overlay (`?`)
+- [x] Handle modifier keys (Cmd, Shift, Ctrl, Alt)
+- [x] Prevent conflicts with system shortcuts
 - [ ] Add visual feedback for actions (e.g., brief highlight on navigation)
 
 ### Keyboard Help Overlay
@@ -957,15 +957,15 @@ interface AppState {
 
 ### Tasks
 
-- [ ] Create Rust-side window manager to track windows
-- [ ] Implement `create_window` Tauri command with unique window ID
-- [ ] Isolate Zustand stores per window (use window ID as namespace)
-- [ ] Add "File > New Window" menu item (Cmd+N)
+- [x] Create Rust-side window manager to track windows
+- [x] Implement `create_window` Tauri command with unique window ID
+- [x] Isolate Zustand stores per window (use window ID as namespace)
+- [x] Add "File > New Window" menu item (Cmd+N)
 - [ ] Add "File > Open Recent" submenu
-- [ ] Persist all window states to app data directory
-- [ ] Restore windows on app launch
-- [ ] Update window title to include project name
-- [ ] Handle window close (remove from state, cleanup)
+- [x] Persist all window states to app data directory
+- [x] Restore windows on app launch
+- [x] Update window title to include project name
+- [x] Handle window close (remove from state, cleanup)
 - [ ] Add Window menu showing all open projects
 
 ### Deliverable
@@ -1008,16 +1008,16 @@ components/
 
 ### Tasks
 
-- [ ] Implement `open_in_editor` Tauri command
-- [ ] Parse editor command template with placeholders
-- [ ] Implement clipboard write command
-- [ ] Add "Copy file path" action
+- [x] Implement `open_in_editor` Tauri command
+- [x] Parse editor command template with placeholders
+- [x] Implement clipboard write command
+- [x] Add "Copy file path" action
 - [ ] Add "Copy file path + line" action
 - [ ] Add "Copy hunk as text" action
 - [ ] Implement file-level collapse in diff pane
-- [ ] Implement hunk-level collapse
+- [x] Implement hunk-level collapse
 - [ ] Add "Collapse all" / "Expand all" buttons
-- [ ] Persist collapse state to review state
+- [x] Persist collapse state to review state
 - [ ] Add right-click context menu on lines
 
 ### Deliverable
@@ -1077,15 +1077,15 @@ components/
 
 ### Tasks
 
-- [ ] Implement Rust file watcher with notify crate
-- [ ] Filter out irrelevant changes (.revi/, node_modules/, etc.)
+- [x] Implement Rust file watcher with notify crate
+- [x] Filter out irrelevant changes (.revi/, node_modules/, etc.)
 - [ ] Detect git ref changes (HEAD, branch refs)
-- [ ] Emit change events to React frontend
-- [ ] Create refresh banner component
-- [ ] Implement "Refresh" action
+- [x] Emit change events to React frontend
+- [x] Create refresh banner component
+- [x] Implement "Refresh" action
 - [ ] On refresh: recompute manifest, apply fuzzy recovery
-- [ ] Implement "Dismiss" action (ignore until next change)
-- [ ] Show banner non-intrusively (top of diff pane, not modal)
+- [x] Implement "Dismiss" action (ignore until next change)
+- [x] Show banner non-intrusively (top of diff pane, not modal)
 
 ### Refresh Flow
 
@@ -1158,6 +1158,7 @@ components/
 - [ ] Apply default diff mode from config
 - [ ] Apply default base from config (in CLI)
 - [ ] Validate config file and show errors gracefully
+- [ ] Add Help > Keyboard Shortcuts native menu item (requires debugging Tauri 2 app.emit → frontend listen wiring; the `?` key shortcut works as the interim solution)
 
 ### Exclusion Logic
 
@@ -1174,9 +1175,9 @@ function filterFiles(files: FileEntry[], exclude: string[]): FileEntry[] {
 
 ### Final Polish
 
-- [ ] Add loading states for diff fetching
-- [ ] Add error states (git errors, file not found)
-- [ ] Ensure scroll position retention when switching files
+- [x] Add loading states for diff fetching
+- [x] Add error states (git errors, file not found)
+- [x] Ensure scroll position retention when switching files
 - [ ] Test with large repos (1000+ changed files)
 - [ ] Test with large files (10000+ lines)
 - [ ] Performance profiling and optimization
@@ -1572,20 +1573,20 @@ See **Phase 13** for detailed test implementation plan.
 ## Definition of Done (MVP + v1.75)
 
 - [ ] `revi .` generates manifest and launches app
-- [ ] App shows changed files with status and stats
-- [ ] Split and unified diff modes work
-- [ ] Syntax highlighting works for common languages
-- [ ] Files can be marked as viewed
-- [ ] Hunks can be collapsed
-- [ ] All keyboard shortcuts work
-- [ ] State persists across sessions
+- [x] App shows changed files with status and stats
+- [x] Split and unified diff modes work
+- [x] Syntax highlighting works for common languages
+- [x] Files can be marked as viewed
+- [x] Hunks can be collapsed
+- [x] All keyboard shortcuts work
+- [x] State persists across sessions
 - [ ] Fuzzy recovery works after amend/rebase
-- [ ] Changes are detected and refresh works
+- [x] Changes are detected and refresh works
 - [ ] Config file is respected
 - [ ] Exclusion patterns work
 - [ ] Whitespace toggle works
-- [ ] Open in editor works
-- [ ] Copy file path works
+- [x] Open in editor works
+- [x] Copy file path works
 - [ ] Performance acceptable for 100+ file changesets
 - [ ] Can add comments on diff lines
 - [ ] "Copy Comments for AI" button copies markdown to clipboard

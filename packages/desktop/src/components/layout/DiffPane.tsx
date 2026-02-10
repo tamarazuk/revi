@@ -11,10 +11,11 @@ import { SplitView } from '../diff/SplitView';
 export function DiffPane() {
   const { selectedFile, session } = useSessionStore();
   const { diffMode } = useUIStore();
-  const { getCollapseState, setHunkCollapsed } = useReviewStateStore();
+  const { getCollapseState, setHunkCollapsed, setFileCollapsed } = useReviewStateStore();
   const { diff, isLoading, error } = useDiff({ filePath: selectedFile });
 
   const collapseState = selectedFile ? getCollapseState(selectedFile) : null;
+  const isFileCollapsedState = collapseState?.file ?? false;
   const collapsedHunks = useMemo(
     () => new Set(collapseState?.hunks ?? []),
     [collapseState],
@@ -27,6 +28,26 @@ export function DiffPane() {
     },
     [selectedFile, collapsedHunks, setHunkCollapsed],
   );
+  const onToggleFileCollapse = useCallback(() => {
+    if (!selectedFile) return;
+    setFileCollapsed(selectedFile, !isFileCollapsedState);
+  }, [selectedFile, isFileCollapsedState, setFileCollapsed]);
+
+  const hunkCount = diff?.hunks.length ?? 0;
+
+  const onCollapseAllHunks = useCallback(() => {
+    if (!selectedFile || !diff) return;
+    for (let i = 0; i < diff.hunks.length; i++) {
+      setHunkCollapsed(selectedFile, i, true);
+    }
+  }, [selectedFile, diff, setHunkCollapsed]);
+
+  const onExpandAllHunks = useCallback(() => {
+    if (!selectedFile || !diff) return;
+    for (let i = 0; i < diff.hunks.length; i++) {
+      setHunkCollapsed(selectedFile, i, false);
+    }
+  }, [selectedFile, diff, setHunkCollapsed]);
 
   if (!session) return null;
 
@@ -57,21 +78,24 @@ export function DiffPane() {
   if (file.binary) {
     return (
       <main className="diff-pane">
-        <DiffHeader file={file} repoRoot={session.repoRoot} />
-        <div className="diff-pane__content diff-pane__content--centered">
-          <div className="binary-message">
-            <p>Binary file</p>
-            <p className="dim">{file.path}</p>
+        <DiffHeader file={file} repoRoot={session.repoRoot} isCollapsed={isFileCollapsedState} onToggleCollapse={onToggleFileCollapse} hunkCount={0} />
+        {!isFileCollapsedState && (
+          <div className="diff-pane__content diff-pane__content--centered">
+            <div className="binary-message">
+              <p>Binary file</p>
+              <p className="dim">{file.path}</p>
+            </div>
           </div>
-        </div>
+        )}
       </main>
     );
   }
 
   return (
     <main className="diff-pane">
-      <DiffHeader file={file} repoRoot={session.repoRoot} />
-      <div className="diff-pane__content">
+      <DiffHeader file={file} repoRoot={session.repoRoot} isCollapsed={isFileCollapsedState} onToggleCollapse={onToggleFileCollapse} hunkCount={hunkCount} onCollapseAllHunks={onCollapseAllHunks} onExpandAllHunks={onExpandAllHunks} />
+      {!isFileCollapsedState && (
+        <div className="diff-pane__content">
         {isLoading && (
           <div className="diff-loading">
             <span className="diff-loading__spinner" />
@@ -98,6 +122,7 @@ export function DiffPane() {
           </>
         )}
       </div>
+      )}
     </main>
   );
 }
@@ -111,9 +136,14 @@ interface DiffHeaderProps {
     renamedFrom?: string;
   };
   repoRoot: string;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  hunkCount: number;
+  onCollapseAllHunks?: () => void;
+  onExpandAllHunks?: () => void;
 }
 
-function DiffHeader({ file, repoRoot }: DiffHeaderProps) {
+function DiffHeader({ file, repoRoot, isCollapsed, onToggleCollapse, hunkCount, onCollapseAllHunks, onExpandAllHunks }: DiffHeaderProps) {
   const handleCopyPath = () => {
     invoke('copy_to_clipboard', { content: file.path }).catch((err) => {
       console.error('Failed to copy to clipboard:', err);
@@ -130,6 +160,13 @@ function DiffHeader({ file, repoRoot }: DiffHeaderProps) {
   return (
     <div className="diff-pane__header">
       <div className="diff-pane__path-info">
+        <button
+          className="diff-pane__collapse-toggle"
+          onClick={onToggleCollapse}
+          title={isCollapsed ? 'Expand file' : 'Collapse file'}
+        >
+          {isCollapsed ? '▶' : '▼'}
+        </button>
         {file.renamedFrom && (
           <span className="diff-pane__renamed">
             {file.renamedFrom} →{' '}
@@ -137,19 +174,37 @@ function DiffHeader({ file, repoRoot }: DiffHeaderProps) {
         )}
         <span className="diff-pane__path">{file.path}</span>
         <div className="diff-pane__actions">
+          {!isCollapsed && hunkCount > 1 && (
+            <>
+              <button
+                className="diff-pane__action"
+                onClick={onCollapseAllHunks}
+                title="Collapse all hunks"
+              >
+                Collapse all
+              </button>
+              <button
+                className="diff-pane__action"
+                onClick={onExpandAllHunks}
+                title="Expand all hunks"
+              >
+                Expand all
+              </button>
+            </>
+          )}
           <button
             className="diff-pane__action"
             onClick={handleCopyPath}
             title="Copy relative path (⌘C)"
           >
-<CopyIcon size={16} />
+            <CopyIcon size={16} />
           </button>
           <button
             className="diff-pane__action"
             onClick={handleOpenInEditor}
             title="Open in editor (⌘⇧O)"
           >
-<CodeBlockIcon size={16} />
+            <CodeBlockIcon size={16} />
           </button>
         </div>
       </div>

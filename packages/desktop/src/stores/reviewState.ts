@@ -3,6 +3,15 @@ import { invoke } from '@tauri-apps/api/core';
 import type { PersistedState, FileState, DiffStats, CollapseState, DiffMode } from '@revi/shared';
 
 /**
+ * Recovery info for a file that was previously viewed but whose diff changed.
+ */
+interface FileRecoveryInfo {
+  changedSinceViewed: boolean;
+  oldStats: DiffStats;
+  newStats: DiffStats;
+}
+
+/**
  * Review state store - manages viewed files, scroll positions, and collapse state.
  * Persists to .revi/state/<base>..<head>.json via Tauri commands.
  */
@@ -15,6 +24,9 @@ interface ReviewStateStore {
   headSha: string | null;
   files: Record<string, FileState>;
 
+  // Recovery info (populated after fuzzy recovery)
+  recoveryInfo: Record<string, FileRecoveryInfo>;
+
   // Loading state
   isLoaded: boolean;
   isSaving: boolean;
@@ -24,6 +36,8 @@ interface ReviewStateStore {
   markUnviewed: (path: string) => void;
   toggleViewed: (path: string, contentHash: string, diffStats: DiffStats) => void;
   isViewed: (path: string) => boolean;
+  getRecoveryInfo: (path: string) => FileRecoveryInfo | null;
+  clearRecoveryInfo: (path: string) => void;
 
   // Actions - collapse state
   setFileCollapsed: (path: string, collapsed: boolean) => void;
@@ -35,7 +49,7 @@ interface ReviewStateStore {
   getScrollPosition: (path: string) => number;
 
   // Persistence
-  loadState: (repoRoot: string, sessionId: string, baseSha: string, headSha: string) => Promise<void>;
+  loadState: (repoRoot: string, sessionId: string, baseSha: string, headSha: string, files?: { path: string; contentHash: string; additions: number; deletions: number }[]) => Promise<void>;
   saveState: () => Promise<void>;
   scheduleSave: () => void;
   reset: () => void;
@@ -67,6 +81,7 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
   baseSha: null,
   headSha: null,
   files: {},
+  recoveryInfo: {},
   isLoaded: false,
   isSaving: false,
 
@@ -116,6 +131,17 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
   isViewed: (path: string) => {
     const fileState = get().files[path];
     return fileState?.viewed ?? false;
+  },
+
+  getRecoveryInfo: (path: string) => {
+    return get().recoveryInfo[path] ?? null;
+  },
+
+  clearRecoveryInfo: (path: string) => {
+    set((state) => {
+      const { [path]: _, ...rest } = state.recoveryInfo;
+      return { recoveryInfo: rest };
+    });
   },
 
   setFileCollapsed: (path: string, collapsed: boolean) => {
@@ -184,8 +210,8 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
     return get().files[path]?.scrollPosition ?? 0;
   },
 
-  loadState: async (repoRoot: string, sessionId: string, baseSha: string, headSha: string) => {
-    set({ repoRoot, sessionId, baseSha, headSha, isLoaded: false });
+  loadState: async (repoRoot: string, sessionId: string, baseSha: string, headSha: string, newFiles?: { path: string; contentHash: string; additions: number; deletions: number }[]) => {
+    set({ repoRoot, sessionId, baseSha, headSha, isLoaded: false, recoveryInfo: {} });
 
     try {
       const persistedState = await invoke<PersistedState | null>('load_review_state', {
@@ -199,9 +225,65 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
           files: persistedState.files,
           isLoaded: true,
         });
-      } else {
-        set({ files: {}, isLoaded: true });
+        return;
       }
+
+      // Exact SHA match failed — try fuzzy recovery if we have file info
+      if (newFiles && newFiles.length > 0) {
+        try {
+          const recovered = await invoke<{
+            files: Record<string, {
+              viewed: boolean;
+              changedSinceViewed: boolean;
+              oldStats: { additions: number; deletions: number };
+              newStats: { additions: number; deletions: number };
+              scrollPosition: number;
+              collapseState: { file: boolean; hunks: number[] };
+            }>;
+            recoveredFrom: string;
+          } | null>('recover_state', {
+            repoRoot,
+            baseSha,
+            headSha,
+            newFiles: newFiles.map(f => ({
+              path: f.path,
+              additions: f.additions,
+              deletions: f.deletions,
+            })),
+          });
+
+          if (recovered) {
+            const files: Record<string, FileState> = {};
+            const recoveryInfo: Record<string, FileRecoveryInfo> = {};
+
+            for (const [path, r] of Object.entries(recovered.files)) {
+              files[path] = {
+                viewed: r.viewed,
+                lastViewedSha: baseSha,
+                contentHash: '',
+                diffStats: r.newStats,
+                collapseState: r.collapseState,
+                scrollPosition: r.scrollPosition,
+              };
+              if (r.changedSinceViewed) {
+                recoveryInfo[path] = {
+                  changedSinceViewed: true,
+                  oldStats: r.oldStats,
+                  newStats: r.newStats,
+                };
+              }
+            }
+
+            console.log(`Recovered review state from ${recovered.recoveredFrom}`);
+            set({ files, recoveryInfo, isLoaded: true });
+            return;
+          }
+        } catch (err) {
+          console.warn('Recovery failed, starting fresh:', err);
+        }
+      }
+
+      set({ files: {}, isLoaded: true });
     } catch (error) {
       console.error('Failed to load review state:', error);
       set({ files: {}, isLoaded: true });
@@ -272,6 +354,7 @@ export const useReviewStateStore = create<ReviewStateStore>((set, get) => ({
       baseSha: null,
       headSha: null,
       files: {},
+      recoveryInfo: {},
       isLoaded: false,
       isSaving: false,
     });

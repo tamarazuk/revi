@@ -13,6 +13,68 @@ const MAX_HEIGHT: f64 = 5000.0;
 const DEFAULT_WIDTH: f64 = 1400.0;
 const DEFAULT_HEIGHT: f64 = 900.0;
 
+/// Screen bounds for clamping window dimensions and position
+#[derive(Debug, Clone, Copy)]
+struct ScreenBounds {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+impl ScreenBounds {
+    /// Get screen bounds from the primary monitor, or return None if unavailable
+    fn from_app(app: &AppHandle) -> Option<Self> {
+        // Try to get any webview window to query monitor info
+        // (monitors are queried via windows in Tauri)
+        let window = app.webview_windows().into_values().next()?;
+        let monitor = window.primary_monitor().ok()??;
+        let size = monitor.size();
+        let position = monitor.position();
+        let scale = monitor.scale_factor();
+
+        Some(ScreenBounds {
+            x: position.x as f64,
+            y: position.y as f64,
+            width: size.width as f64 / scale,
+            height: size.height as f64 / scale,
+        })
+    }
+
+    /// Clamp dimensions to fit within screen bounds (with some margin for window chrome)
+    fn clamp_size(&self, width: f64, height: f64) -> (f64, f64) {
+        // Leave some margin for window decorations and dock/taskbar
+        let max_w = (self.width - 50.0).max(MIN_WIDTH);
+        let max_h = (self.height - 100.0).max(MIN_HEIGHT);
+
+        let w = width.clamp(MIN_WIDTH, max_w);
+        let h = height.clamp(MIN_HEIGHT, max_h);
+        (w, h)
+    }
+
+    /// Clamp position so the window is visible on screen
+    /// Returns adjusted (x, y) or None if position should be auto (centered)
+    fn clamp_position(&self, x: f64, y: f64, width: f64, height: f64) -> Option<(f64, f64)> {
+        // Window is considered off-screen if less than 100px is visible
+        let min_visible = 100.0;
+
+        // Check if window would be reasonably visible
+        let visible_x = x + width > self.x + min_visible && x < self.x + self.width - min_visible;
+        let visible_y = y + height > self.y + min_visible && y < self.y + self.height - min_visible;
+
+        if !visible_x || !visible_y {
+            // Window is off-screen, let the system position it
+            return None;
+        }
+
+        // Clamp to keep window on screen
+        let clamped_x = x.clamp(self.x, (self.x + self.width - width).max(self.x));
+        let clamped_y = y.clamp(self.y, (self.y + self.height - height).max(self.y));
+
+        Some((clamped_x, clamped_y))
+    }
+}
+
 /// Clamp dimensions to reasonable bounds, returning defaults if invalid
 fn sanitize_dimensions(width: Option<f64>, height: Option<f64>) -> (f64, f64) {
     let w = width
@@ -22,6 +84,36 @@ fn sanitize_dimensions(width: Option<f64>, height: Option<f64>) -> (f64, f64) {
         .filter(|&v| v >= MIN_HEIGHT && v <= MAX_HEIGHT)
         .unwrap_or(DEFAULT_HEIGHT);
     (w, h)
+}
+
+/// Sanitize dimensions and clamp to screen bounds
+fn sanitize_dimensions_for_screen(
+    width: Option<f64>,
+    height: Option<f64>,
+    screen: Option<ScreenBounds>,
+) -> (f64, f64) {
+    let (w, h) = sanitize_dimensions(width, height);
+    match screen {
+        Some(bounds) => bounds.clamp_size(w, h),
+        None => (w.min(DEFAULT_WIDTH), h.min(DEFAULT_HEIGHT)), // Conservative fallback
+    }
+}
+
+/// Sanitize position for screen bounds
+/// Returns Some((x, y)) if position is valid, None if window should use default positioning
+fn sanitize_position_for_screen(
+    x: Option<f64>,
+    y: Option<f64>,
+    width: f64,
+    height: f64,
+    screen: Option<ScreenBounds>,
+) -> Option<(f64, f64)> {
+    let (px, py) = (x?, y?);
+
+    match screen {
+        Some(bounds) => bounds.clamp_position(px, py, width, height),
+        None => None, // No screen info, let system position the window
+    }
 }
 
 /// Check if a dimension value is within valid bounds (for write-path validation)
@@ -315,24 +407,62 @@ pub fn restore_windows(app: &AppHandle) {
     }
     manager.set_counter_min(max_counter + 1);
 
-    for info in &states.windows {
-        // Sanitize dimensions to prevent corrupted state from breaking rendering
-        let (w, h) = sanitize_dimensions(info.width, info.height);
+    // Get screen bounds once (will be None until first window is available)
+    // We'll query again after main window is set up
+    let mut screen_bounds: Option<ScreenBounds> = None;
 
+    for info in &states.windows {
         if info.label == "main" {
             // Main window is already created by tauri.conf.json — just register session info
             // and restore position/size
             if let Some(win) = app.get_webview_window("main") {
-                if let (Some(x), Some(y)) = (info.x, info.y) {
+                // Now we can get screen bounds from the main window
+                if screen_bounds.is_none() {
+                    screen_bounds = win.primary_monitor().ok().flatten().map(|monitor| {
+                        let size = monitor.size();
+                        let position = monitor.position();
+                        let scale = monitor.scale_factor();
+                        ScreenBounds {
+                            x: position.x as f64,
+                            y: position.y as f64,
+                            width: size.width as f64 / scale,
+                            height: size.height as f64 / scale,
+                        }
+                    });
+                }
+
+                // Sanitize dimensions with screen awareness
+                let (w, h) = sanitize_dimensions_for_screen(info.width, info.height, screen_bounds);
+
+                // Sanitize position - may return None if off-screen
+                let position = sanitize_position_for_screen(info.x, info.y, w, h, screen_bounds);
+
+                // Apply size first, then position
+                let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(w, h)));
+
+                if let Some((x, y)) = position {
                     let _ = win
                         .set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
+                } else {
+                    // Center the window if position was invalid/off-screen
+                    let _ = win.center();
                 }
-                let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize::new(w, h)));
             }
 
             let mut windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());
             windows.insert("main".to_string(), info.clone());
         } else {
+            // Get screen bounds if we don't have them yet (from main window)
+            if screen_bounds.is_none() {
+                screen_bounds = ScreenBounds::from_app(app);
+            }
+
+            // Sanitize dimensions with screen awareness
+            let (w, h) = sanitize_dimensions_for_screen(info.width, info.height, screen_bounds);
+
+            // Sanitize position
+            let position = sanitize_position_for_screen(info.x, info.y, w, h, screen_bounds);
+
             // Create additional windows
             let mut builder = WebviewWindowBuilder::new(app, &info.label, WebviewUrl::default())
                 .title("Revi")
@@ -340,9 +470,10 @@ pub fn restore_windows(app: &AppHandle) {
                 .inner_size(w, h)
                 .resizable(true);
 
-            if let (Some(x), Some(y)) = (info.x, info.y) {
+            if let Some((x, y)) = position {
                 builder = builder.position(x, y);
             }
+            // If position is None, window will be auto-positioned by the system
 
             if builder.build().is_ok() {
                 let mut windows = manager.windows.lock().unwrap_or_else(|e| e.into_inner());

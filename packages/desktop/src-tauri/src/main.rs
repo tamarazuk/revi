@@ -4,10 +4,11 @@
 mod commands;
 
 use commands::{file_ops, git, highlight, session, watcher, window};
-use tauri::Manager;
+use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -19,6 +20,7 @@ fn main() {
             session::load_session,
             session::save_review_state,
             session::load_review_state,
+            session::recover_state,
             session::create_session_from_repo,
             session::save_last_session,
             session::load_last_session,
@@ -44,6 +46,30 @@ fn main() {
             watcher::stop_watching,
         ])
         .setup(|app| {
+            // Build the File menu
+            let new_window = MenuItemBuilder::with_id("new_window", "New Window")
+                .accelerator("CmdOrCtrl+N")
+                .build(app)?;
+            let quit = PredefinedMenuItem::quit(app, Some("Quit Revi"))?;
+
+            let file_menu = SubmenuBuilder::new(app, "File")
+                .item(&new_window)
+                .separator()
+                .item(&quit)
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&file_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            app.on_menu_event(move |app_handle: &tauri::AppHandle, event| {
+                if event.id().0.as_str() == "new_window" {
+                    let _ = window::create_window(app_handle.clone());
+                }
+            });
+
             window::restore_windows(app.handle());
             Ok(())
         })
@@ -52,7 +78,7 @@ fn main() {
             let label = window.label().to_string();
 
             match event {
-                tauri::WindowEvent::Moved(position) => {
+                WindowEvent::Moved(position) => {
                     let manager = app.state::<window::WindowManager>();
                     let mut windows =
                         manager.windows.lock().unwrap_or_else(|e| e.into_inner());
@@ -61,7 +87,7 @@ fn main() {
                         info.y = Some(position.y as f64);
                     }
                 }
-                tauri::WindowEvent::Resized(size) => {
+                WindowEvent::Resized(size) => {
                     let width = size.width as f64;
                     let height = size.height as f64;
 
@@ -76,10 +102,10 @@ fn main() {
                         }
                     }
                 }
-                tauri::WindowEvent::CloseRequested { .. } => {
+                WindowEvent::CloseRequested { .. } => {
                     let _ = window::persist_states_sync(app);
                 }
-                tauri::WindowEvent::Destroyed => {
+                WindowEvent::Destroyed => {
                     let manager = app.state::<window::WindowManager>();
                     let mut windows =
                         manager.windows.lock().unwrap_or_else(|e| e.into_inner());
@@ -88,6 +114,27 @@ fn main() {
                 _ => {}
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    // Run app with custom event handling for macOS lifecycle
+    app.run(|app_handle, event| {
+        match event {
+            // On macOS, prevent app from quitting when all windows are closed
+            #[cfg(target_os = "macos")]
+            RunEvent::ExitRequested { api, .. } => {
+                api.prevent_exit();
+            }
+            // Handle dock icon click on macOS when no windows are open
+            RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } => {
+                if !has_visible_windows {
+                    let _ = window::create_window(app_handle.clone());
+                }
+            }
+            _ => {}
+        }
+    });
 }

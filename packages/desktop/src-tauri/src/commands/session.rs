@@ -1,6 +1,7 @@
 use chrono::Utc;
 use nanoid::nanoid;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -210,6 +211,139 @@ pub fn load_review_state(
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse state file: {}", e))?;
 
     Ok(Some(state))
+}
+
+/// Input for recovery: a file from the new manifest with its stats
+#[derive(Debug, Deserialize)]
+pub struct FileWithStats {
+    pub path: String,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// Result of recovering a single file's review state
+#[derive(Debug, Serialize)]
+pub struct FileRecoveryResult {
+    pub viewed: bool,
+    #[serde(rename = "changedSinceViewed")]
+    pub changed_since_viewed: bool,
+    #[serde(rename = "oldStats")]
+    pub old_stats: DiffStats,
+    #[serde(rename = "newStats")]
+    pub new_stats: DiffStats,
+    #[serde(rename = "scrollPosition")]
+    pub scroll_position: u32,
+    #[serde(rename = "collapseState")]
+    pub collapse_state: CollapseState,
+}
+
+/// Result of fuzzy state recovery
+#[derive(Debug, Serialize)]
+pub struct RecoveredState {
+    pub files: HashMap<String, FileRecoveryResult>,
+    #[serde(rename = "recoveredFrom")]
+    pub recovered_from: String,
+}
+
+/// Recover review state when exact SHA match fails.
+/// Scans .revi/state/ for the most recent state file, then compares
+/// diff stats to determine which files' viewed status can be preserved.
+#[tauri::command]
+pub fn recover_state(
+    repo_root: String,
+    base_sha: String,
+    head_sha: String,
+    new_files: Vec<FileWithStats>,
+) -> Result<Option<RecoveredState>, String> {
+    let state_dir = Path::new(&repo_root).join(".revi").join("state");
+    if !state_dir.exists() {
+        return Ok(None);
+    }
+
+    // Don't recover from the exact match (that's handled by load_review_state)
+    let exact_name = format!("{}..{}.json", base_sha, head_sha);
+
+    // Find the most recent state file by modification time
+    let mut best_entry: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+    let entries =
+        fs::read_dir(&state_dir).map_err(|e| format!("Failed to read state dir: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if path.file_name().and_then(|n| n.to_str()) == Some(&exact_name) {
+            continue;
+        }
+        if let Ok(metadata) = path.metadata() {
+            if let Ok(modified) = metadata.modified() {
+                if best_entry.is_none() || modified > best_entry.as_ref().unwrap().0 {
+                    best_entry = Some((modified, path));
+                }
+            }
+        }
+    }
+
+    let state_path = match best_entry {
+        Some((_, path)) => path,
+        None => return Ok(None),
+    };
+
+    let file_name = state_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let content =
+        fs::read_to_string(&state_path).map_err(|e| format!("Failed to read state: {}", e))?;
+    let old_state: PersistedState =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse state: {}", e))?;
+
+    // Build lookup from new manifest
+    let new_files_map: HashMap<&str, &FileWithStats> =
+        new_files.iter().map(|f| (f.path.as_str(), f)).collect();
+
+    let mut recovered_files = HashMap::new();
+
+    for (path, old_file) in &old_state.files {
+        if let Some(new_file) = new_files_map.get(path.as_str()) {
+            // Use diff stats as a heuristic: if additions+deletions match, content likely unchanged
+            let stats_match = old_file.diff_stats.additions == new_file.additions
+                && old_file.diff_stats.deletions == new_file.deletions;
+
+            recovered_files.insert(
+                path.clone(),
+                FileRecoveryResult {
+                    viewed: if stats_match { old_file.viewed } else { false },
+                    changed_since_viewed: old_file.viewed && !stats_match,
+                    old_stats: DiffStats {
+                        additions: old_file.diff_stats.additions,
+                        deletions: old_file.diff_stats.deletions,
+                    },
+                    new_stats: DiffStats {
+                        additions: new_file.additions,
+                        deletions: new_file.deletions,
+                    },
+                    scroll_position: old_file.scroll_position,
+                    collapse_state: CollapseState {
+                        file: old_file.collapse_state.file,
+                        hunks: old_file.collapse_state.hunks.clone(),
+                    },
+                },
+            );
+        }
+    }
+
+    if recovered_files.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(RecoveredState {
+        files: recovered_files,
+        recovered_from: file_name,
+    }))
 }
 
 /// Create a new review session from a repository path
@@ -438,8 +572,7 @@ fn get_uncommitted_files(repo_root: &str) -> Result<Vec<FileEntry>, String> {
         .current_dir(repo_root)
         .output()
         .map_err(|e| format!("Failed to get name-status: {}", e))?;
-    let name_status_map =
-        parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
+    let name_status_map = parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
 
     let mut files = Vec::new();
     let stdout = String::from_utf8_lossy(&diff_output.stdout);
@@ -572,8 +705,7 @@ fn get_changed_files(
         .current_dir(repo_root)
         .output()
         .map_err(|e| format!("Failed to get name-status: {}", e))?;
-    let name_status_map =
-        parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
+    let name_status_map = parse_name_status(&String::from_utf8_lossy(&name_status_output.stdout));
 
     let mut files = Vec::new();
     let stdout = String::from_utf8_lossy(&output.stdout);

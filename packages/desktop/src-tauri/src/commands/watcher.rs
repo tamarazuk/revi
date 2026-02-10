@@ -40,7 +40,7 @@ impl WatcherManager {
 /// Directory prefixes to completely ignore (and all their contents)
 const IGNORED_DIRS: &[&str] = &[
     ".revi",
-    ".git", // Ignore ALL of .git - we don't need git internals
+    ".git", // Ignore .git internals (HEAD and refs/ are allowlisted separately)
     "node_modules",
     ".next",
     "target",
@@ -81,6 +81,30 @@ const IGNORED_PREFIXES: &[&str] = &[
     "#", // Emacs auto-save
 ];
 
+/// Git ref paths we selectively allow through the .git/ ignore rule.
+/// Changes to these indicate branch switches, commits, rebases, etc.
+fn is_git_ref_path(relative_path: &str) -> bool {
+    relative_path == ".git/HEAD" || relative_path.starts_with(".git/refs/")
+}
+
+/// Read the current HEAD SHA for a repository via `git rev-parse HEAD`
+fn read_head_sha(repo_root: &Path) -> Option<String> {
+    std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(repo_root)
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                String::from_utf8(output.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            } else {
+                None
+            }
+        })
+}
+
 /// Check if a path should be ignored
 fn should_ignore(path: &Path, repo_root: &Path) -> bool {
     let relative = match path.strip_prefix(repo_root) {
@@ -89,6 +113,11 @@ fn should_ignore(path: &Path, repo_root: &Path) -> bool {
     };
 
     let path_str = relative.to_string_lossy();
+
+    // Allow specific git ref paths through before the IGNORED_DIRS check
+    if is_git_ref_path(&path_str) {
+        return false;
+    }
 
     // Check if path starts with or contains an ignored directory
     // Must match full directory component, not just prefix (e.g., ".git/" not ".gitignore")
@@ -250,6 +279,25 @@ fn handle_event(
         return;
     }
 
+    // Partition into git ref paths vs regular file paths
+    let has_ref_change = relevant_paths.iter().any(|p| {
+        p.strip_prefix(repo_root)
+            .ok()
+            .map(|rel| is_git_ref_path(&rel.to_string_lossy()))
+            .unwrap_or(false)
+    });
+
+    let file_paths: Vec<PathBuf> = relevant_paths
+        .iter()
+        .filter(|p| {
+            p.strip_prefix(repo_root)
+                .ok()
+                .map(|rel| !is_git_ref_path(&rel.to_string_lossy()))
+                .unwrap_or(true)
+        })
+        .cloned()
+        .collect();
+
     // Mark that we have a pending change
     {
         let mut pending = pending_change.lock().unwrap();
@@ -264,9 +312,6 @@ fn handle_event(
     };
 
     if !should_emit {
-        // Event is within debounce window - it's recorded as pending
-        // A later event will pick it up, or if this is the last event,
-        // we won't emit (which is fine - rapid fire events are noise)
         return;
     }
 
@@ -274,7 +319,7 @@ fn handle_event(
     let has_pending = {
         let mut pending = pending_change.lock().unwrap();
         let had_pending = *pending;
-        *pending = false; // Clear pending flag
+        *pending = false;
         had_pending
     };
 
@@ -288,20 +333,32 @@ fn handle_event(
         *last = now;
     }
 
-    // Build the change event
-    let paths: Vec<String> = relevant_paths
-        .iter()
-        .filter_map(|p| p.strip_prefix(repo_root).ok())
-        .map(|p| p.to_string_lossy().to_string())
-        .collect();
+    // Emit ref_changed if git refs were modified (branch switch, commit, rebase)
+    if has_ref_change {
+        let new_head_sha = read_head_sha(repo_root);
+        let ref_event = ChangeEvent {
+            event_type: "ref_changed".to_string(),
+            repo_root: repo_root.to_string_lossy().to_string(),
+            paths: None,
+            new_head_sha,
+        };
+        let _ = app_handle.emit("repo-changed", ref_event);
+    }
 
-    let change_event = ChangeEvent {
-        event_type: "file_changed".to_string(),
-        repo_root: repo_root.to_string_lossy().to_string(),
-        paths: Some(paths),
-        new_head_sha: None,
-    };
+    // Emit file_changed if regular files were modified
+    if !file_paths.is_empty() {
+        let paths: Vec<String> = file_paths
+            .iter()
+            .filter_map(|p| p.strip_prefix(repo_root).ok())
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
 
-    // Emit event to frontend
-    let _ = app_handle.emit("repo-changed", change_event);
+        let change_event = ChangeEvent {
+            event_type: "file_changed".to_string(),
+            repo_root: repo_root.to_string_lossy().to_string(),
+            paths: Some(paths),
+            new_head_sha: None,
+        };
+        let _ = app_handle.emit("repo-changed", change_event);
+    }
 }

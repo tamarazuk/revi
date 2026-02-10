@@ -36,13 +36,31 @@
 | **Phase 9** | Done | File interactions (open in editor, copy path, context menu) |
 | **Phase 10** | Done | Change detection (file watcher, refresh banner, state preservation) |
 
+### Uncommitted Changes (not yet committed)
+
+**Native Mac menu + app lifecycle**:
+- `main.rs` — File menu (New Window Cmd+N, Quit Cmd+Q)
+- `main.rs` — macOS-only: app stays alive after last window closes, dock icon reopens window
+- `main.rs` — Menu events: new window creation
+
+**Window screen bounds clamping**:
+- `window.rs` — `ScreenBounds` struct queries primary monitor dimensions
+- `window.rs` — `restore_windows()` clamps size/position to screen; centers if off-screen; falls back to 1400x900
+
+**Sidebar toggle button**:
+- `Sidebar.tsx` — SidebarSimple icon button in header to hide sidebar; collapsed 36px strip with reopen button when hidden
+- `index.css` — `.sidebar--collapsed`, `.sidebar__reopen`, `.sidebar__toggle` styles
+
+**Responsive keyboard help + shadcn-style keys**:
+- `KeyboardHelp.tsx` — Keys render individually (e.g., `⌘` `N` not `Cmd+N`); two-column grid on wider screens
+- `index.css` — Modal max-height 80vh, scrollable, 2-column at 560px+; kbd styled with bottom border for "key" look
+
 ### Recent Git History
 
 ```
-Phase 10: Change detection with file watcher and refresh banner
-6df7838 feat(desktop): add file interactions and zoom support (Phase 9)
-aec0a54 docs: add Phase 13 (Testing) to implementation plan
-7631be0 test(desktop): add unit tests for dimension sanitization
+7ee5056 feat(window): prevent duplicate windows for same project
+82954f7 fix(watcher): allow dotfiles to trigger refresh banner
+187b992 feat(desktop): add file watcher and refresh banner (Phase 10)
 ```
 
 ---
@@ -87,7 +105,7 @@ revi/
 │   │   │   │   ├── sidebar/      # FileFilter, DirectoryGroup, FileTreeItem, DiffStatsBar
 │   │   │   │   ├── topbar/       # ComparisonModeDropdown
 │   │   │   │   ├── diff/         # DiffLine, HunkHeader, UnifiedView, SplitView, SplitDiffLine
-│   │   │   │   ├── overlays/     # KeyboardHelp
+│   │   │   │   ├── overlays/     # KeyboardHelp, RefreshBanner
 │   │   │   │   └── ui/           # ContextMenu
 │   │   │   ├── stores/
 │   │   │   │   ├── session.ts    # Session state + persistence + window state saving
@@ -104,13 +122,14 @@ revi/
 │   │   │
 │   │   ├── src-tauri/            # Rust backend
 │   │   │   ├── src/
-│   │   │   │   ├── main.rs       # Tauri app + command registration + window event handlers
+│   │   │   │   ├── main.rs       # Tauri app + menus + macOS lifecycle + window events
 │   │   │   │   └── commands/
 │   │   │   │       ├── session.rs    # Session CRUD, persistence, working tree
 │   │   │   │       ├── git.rs        # Diff fetching, caching, new/deleted file handling
 │   │   │   │       ├── highlight.rs  # Tree-sitter with full-file context
 │   │   │   │       ├── window.rs     # Window manager, create/restore/persist windows
-│   │   │   │       └── file_ops.rs   # Open in editor, clipboard operations
+│   │   │   │       ├── file_ops.rs   # Open in editor, clipboard operations
+│   │   │   │       └── watcher.rs   # File system watcher for change detection
 │   │   │   ├── capabilities/
 │   │   │   │   └── default.json  # Permissions for main + revi-* windows
 │   │   │   ├── icons/            # App icons (icon.png, icon.svg)
@@ -183,7 +202,9 @@ Each Tauri 2 window runs its own webview with a separate JavaScript execution co
 
 Window states are saved to `{app_data_dir}/window-states.json` containing an array of `WindowInfo` objects. On close, states are persisted. On relaunch, `restore_windows()` reads this file and recreates windows at their saved positions/sizes with their previous projects.
 
-**Dimension sanitization**: Restored window dimensions are validated against reasonable bounds (800-8000 width, 600-5000 height). Invalid values fall back to defaults (1400x900). This prevents corrupted state files from causing GPU compositing failures on retina displays.
+**Dimension sanitization**: Restored window dimensions are validated against reasonable bounds (800-8000 width, 600-5000 height) AND clamped to actual screen size via `ScreenBounds` (queries primary monitor). Off-screen windows are centered. Falls back to defaults (1400x900) if monitor detection fails.
+
+**Native macOS behavior**: App stays alive in dock after last window closes (`RunEvent::ExitRequested` prevented on macOS only). Dock icon click creates new window (`RunEvent::Reopen`). File menu: New Window (Cmd+N), Quit (Cmd+Q). Help menu with Keyboard Shortcuts item deferred — Tauri 2 `app.emit()` to frontend `listen()` wiring was unreliable; `?` key shortcut works as interim.
 
 ---
 
@@ -243,6 +264,8 @@ Window states are saved to `{app_data_dir}/window-states.json` containing an arr
 | `save_window_states` | window.rs | Persist all window states to disk |
 | `load_window_states` | window.rs | Load persisted window states |
 | `get_window_session` | window.rs | Get saved session info for a window |
+| `find_window_by_repo` | window.rs | Find window with a given repo open |
+| `focus_window_and_close` | window.rs | Focus a window, optionally close another |
 | `open_in_editor` | file_ops.rs | Open file in default/configured editor |
 | `copy_to_clipboard` | file_ops.rs | Copy text to system clipboard |
 | `start_watching` | watcher.rs | Start file watcher for a repository |
@@ -340,6 +363,13 @@ TypeScript/TSX, JavaScript/JSX, Rust, Python, Go, JSON, CSS, HTML, Markdown, YAM
 
 ## What's Next
 
+### Immediate: Commit uncommitted changes
+The following changes are staged/unstaged and need to be committed:
+- Native Mac menu + app lifecycle (`main.rs`)
+- Window screen bounds clamping (`window.rs`)
+- Sidebar toggle button (`Sidebar.tsx`, `index.css`)
+- Responsive keyboard help with shadcn-style keys (`KeyboardHelp.tsx`, `index.css`, `App.tsx`)
+
 ### Phase 11: Polish & Config (3-4 days) - RECOMMENDED NEXT
 - Exclusion patterns (.gitignore-style)
 - Whitespace toggle
@@ -360,9 +390,10 @@ See `docs/implementation-plan.md` for full task breakdown.
 1. **App launcher in CLI** - Just prints instructions, doesn't spawn app yet
 2. **TOML highlighting disabled** - tree-sitter-toml 0.20 incompatible with tree-sitter 0.24
 3. **Comparison mode persistence** - Last-used mode not yet persisted per repository
-4. **`G` key (Shift+g)** - The `case 'g'` in useKeyboardManager checks `e.shiftKey` but `e.key` is `'G'` when shifted, so `G` for last file may not work — needs a `case 'G':` added
+4. **`G` key (Shift+g)** - Fixed: separate `case 'G':` handler for last file navigation
 5. **Command palette** - Deferred from Phase 7, not yet implemented
 6. **Zoom persistence** - Zoom level resets on app restart (could persist to localStorage)
+7. **Help > Keyboard Shortcuts menu** - Removed; Tauri 2 `app.emit()` didn't reach frontend `listen()`. Deferred to Phase 11. The `?` key shortcut works fine.
 
 ---
 

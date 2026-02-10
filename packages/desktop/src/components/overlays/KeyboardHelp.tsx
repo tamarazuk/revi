@@ -1,54 +1,75 @@
 import { useKeyboardStore } from '../../stores/keyboard';
 
-const SHORTCUT_GROUPS = [
+// Each shortcut has one or more key combos, each combo is an array of individual keys
+interface Shortcut {
+  keys: string[][];
+  label: string;
+}
+
+interface ShortcutGroup {
+  title: string;
+  shortcuts: Shortcut[];
+}
+
+const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: 'Navigation',
     shortcuts: [
-      { keys: ['j', 'ArrowDown'], label: 'Next file' },
-      { keys: ['k', 'ArrowUp'], label: 'Previous file' },
-      { keys: ['g'], label: 'First file' },
-      { keys: ['G'], label: 'Last file' },
-      { keys: ['Enter', 'o'], label: 'Open file' },
-      { keys: ['n'], label: 'Next hunk' },
-      { keys: ['p'], label: 'Previous hunk' },
+      { keys: [['j'], ['↓']], label: 'Next file' },
+      { keys: [['k'], ['↑']], label: 'Previous file' },
+      { keys: [['g']], label: 'First file' },
+      { keys: [['G']], label: 'Last file' },
+      { keys: [['Enter'], ['o']], label: 'Open file' },
+      { keys: [['n']], label: 'Next hunk' },
+      { keys: [['p']], label: 'Previous hunk' },
     ],
   },
   {
     title: 'Actions',
     shortcuts: [
-      { keys: ['v'], label: 'Toggle viewed' },
-      { keys: ['['], label: 'Collapse active hunk' },
-      { keys: [']'], label: 'Expand active hunk' },
-      { keys: ['r'], label: 'Refresh (when changes detected)' },
+      { keys: [['v']], label: 'Toggle viewed' },
+      { keys: [['[']], label: 'Collapse active hunk' },
+      { keys: [[']']], label: 'Expand active hunk' },
+      { keys: [['r']], label: 'Refresh (when changes detected)' },
     ],
   },
   {
     title: 'View',
     shortcuts: [
-      { keys: ['s'], label: 'Toggle split/unified' },
-      { keys: ['b'], label: 'Toggle sidebar' },
-      { keys: ['?'], label: 'Toggle this help' },
-      { keys: ['Esc'], label: 'Close overlay' },
+      { keys: [['s']], label: 'Toggle split/unified' },
+      { keys: [['b']], label: 'Toggle sidebar' },
+      { keys: [['?']], label: 'Toggle this help' },
+      { keys: [['Esc']], label: 'Close overlay' },
     ],
   },
   {
     title: 'Window',
     shortcuts: [
-      { keys: ['Cmd+N'], label: 'New window' },
-      { keys: ['\u2318+'], label: 'Zoom in' },
-      { keys: ['\u2318-'], label: 'Zoom out' },
-      { keys: ['\u23180'], label: 'Reset zoom' },
+      { keys: [['⌘', 'N']], label: 'New window' },
+      { keys: [['⌘', '+']], label: 'Zoom in' },
+      { keys: [['⌘', '-']], label: 'Zoom out' },
+      { keys: [['⌘', '0']], label: 'Reset zoom' },
     ],
   },
   {
     title: 'File',
     shortcuts: [
-      { keys: ['\u2318\u21e7O'], label: 'Open in editor' },
-      { keys: ['\u2318C'], label: 'Copy relative path' },
-      { keys: ['\u2318\u21e7C'], label: 'Copy absolute path' },
+      { keys: [['⌘', '⇧', 'O']], label: 'Open in editor' },
+      { keys: [['⌘', 'C']], label: 'Copy relative path' },
+      { keys: [['⌘', '⇧', 'C']], label: 'Copy absolute path' },
     ],
   },
 ];
+
+function KeyCombo({ keys }: { keys: string[] }) {
+  return (
+    <span className="keyboard-help__combo">
+      {keys.map((key, i) => (
+        <kbd key={i}>{key}</kbd>
+      ))}
+    </span>
+  );
+}
 
 export function KeyboardHelp() {
   const { helpOverlayOpen, closeHelpOverlay } = useKeyboardStore();
@@ -72,10 +93,10 @@ export function KeyboardHelp() {
                 {group.shortcuts.map((shortcut) => (
                   <div key={shortcut.label} className="keyboard-help__row">
                     <span className="keyboard-help__keys">
-                      {shortcut.keys.map((key, i) => (
-                        <span key={key}>
-                          {i > 0 && <span className="keyboard-help__separator"> / </span>}
-                          <kbd>{key}</kbd>
+                      {shortcut.keys.map((combo, i) => (
+                        <span key={i}>
+                          {i > 0 && <span className="keyboard-help__separator">/</span>}
+                          <KeyCombo keys={combo} />
                         </span>
                       ))}
                     </span>

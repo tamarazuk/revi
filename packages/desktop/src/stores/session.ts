@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import type { ReviewManifest, ComparisonMode } from '@revi/shared';
+import { useReviewStateStore } from './reviewState';
 
 interface LastSession {
   repoPath: string;
@@ -177,6 +178,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      // Force-save current review state before refreshing so recovery can find it
+      await useReviewStateStore.getState().saveState();
+
       // Invalidate diff cache before refreshing
       await invoke('invalidate_diff_cache', { repoRoot: session.repoRoot }).catch(() => {});
 

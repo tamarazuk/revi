@@ -212,17 +212,17 @@ export function useKeyboardManager() {
           break;
         }
         case 'g': {
-          if (e.shiftKey) {
-            // G → last file
-            e.preventDefault();
-            const last = visibleFiles[visibleFiles.length - 1];
-            if (last) selectFile(last.path);
-          } else {
-            // g → first file
-            e.preventDefault();
-            const first = visibleFiles[0];
-            if (first) selectFile(first.path);
-          }
+          // g → first file
+          e.preventDefault();
+          const first = visibleFiles[0];
+          if (first) selectFile(first.path);
+          break;
+        }
+        case 'G': {
+          // G (Shift+g) → last file
+          e.preventDefault();
+          const last = visibleFiles[visibleFiles.length - 1];
+          if (last) selectFile(last.path);
           break;
         }
         case 'v': {

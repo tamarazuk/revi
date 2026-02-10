@@ -96,3 +96,14 @@ pnpm build      # Full build (ask user)
 - `docs/HANDOFF.md` — Current state, architecture, what's next
 - `docs/implementation-plan.md` — Phase breakdown with tasks
 - `docs/revi-prd.md` — Product requirements
+
+### External Documentation
+For Tauri v2 docs, fetch `https://v2.tauri.app/llms.txt` — contains full documentation index with links to all topics (IPC, commands, plugins, distribution, etc.).
+
+### Recommended Skills
+These skills are installed globally and provide domain-specific guidance:
+- `rust-best-practices` — Rust patterns for Tauri backend (`src-tauri/`)
+- `zustand-state-management` — State management patterns for stores (`src/stores/`)
+- `tree-sitter` — Syntax highlighting with tree-sitter grammars
+- `typescript-best-practices` — TypeScript patterns (already available)
+- `react-best-practices` — React hooks/effects patterns (already available)

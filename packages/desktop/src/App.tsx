@@ -79,11 +79,18 @@ export function App() {
   // Load review state when session changes
   useEffect(() => {
     if (session) {
+      const fileInfo = session.files.map(f => ({
+        path: f.path,
+        contentHash: '',
+        additions: f.additions,
+        deletions: f.deletions,
+      }));
       loadReviewState(
         session.repoRoot,
         session.sessionId,
         session.base.sha,
-        session.head.sha
+        session.head.sha,
+        fileInfo
       );
     } else {
       resetReviewState();
