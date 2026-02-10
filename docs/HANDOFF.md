@@ -394,6 +394,7 @@ See `docs/implementation-plan.md` for full task breakdown.
 5. **Command palette** - Deferred from Phase 7, not yet implemented
 6. **Zoom persistence** - Zoom level resets on app restart (could persist to localStorage)
 7. **Help > Keyboard Shortcuts menu** - Removed; Tauri 2 `app.emit()` didn't reach frontend `listen()`. Deferred to Phase 11. The `?` key shortcut works fine.
+8. **Image file display in diff pane** - Binary image files currently have no visual preview. Planned in Phase 11: add image preview + metadata + fallback messaging.
 
 ---
 

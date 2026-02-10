@@ -1155,6 +1155,9 @@ components/
 - [ ] Add "Show hidden files" toggle
 - [ ] Implement whitespace toggle in TopBar
 - [ ] Re-fetch diffs with `-w` flag when whitespace hidden
+- [ ] Add image preview support for binary image files in DiffPane
+- [ ] Show image metadata (format + dimensions + size) when preview is available
+- [ ] Add fallback message for unsupported binary/image formats
 - [ ] Apply default diff mode from config
 - [ ] Apply default base from config (in CLI)
 - [ ] Validate config file and show errors gracefully
